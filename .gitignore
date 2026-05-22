@@ -1,0 +1,35 @@
+.DS_Store
+
+# Environment and secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.p12
+*.pfx
+*.key
+*.crt
+
+# Dependencies and tool caches
+node_modules/
+.bun/
+.venv/
+__pycache__/
+.pytest_cache/
+
+# Logs and local databases
+*.log
+*.sqlite
+*.sqlite-*
+*.db
+*.db-*
+
+# Extension build output and local browser storage exports
+web-ext-artifacts/
+*.zip
+*.xpi
+chrome-storage-export*.json
+firefox-storage-import*.json
+media-log-storage*.json
+browser-profile*/
+browser-storage*/

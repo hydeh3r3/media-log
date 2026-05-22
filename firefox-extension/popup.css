@@ -1,0 +1,373 @@
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  width: 360px;
+  min-height: 200px;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-size: 13px;
+  color: #2D2B2A;
+  background: #F5EEE6;
+}
+
+header {
+  padding: 12px 16px 0;
+  background: #EDE5DA;
+  border-bottom: 1px solid #D4CBC0;
+}
+
+header h1 {
+  font-size: 15px;
+  font-weight: 600;
+  margin-bottom: 8px;
+  color: #DA7756;
+}
+
+nav {
+  display: flex;
+}
+
+.tab {
+  flex: 1;
+  padding: 8px 0;
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: #8B8478;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.tab:hover {
+  color: #5A544C;
+}
+
+.tab.active {
+  color: #DA7756;
+  border-bottom-color: #DA7756;
+}
+
+.tab-content {
+  display: none;
+  padding: 16px;
+}
+
+.tab-content.active {
+  display: block;
+}
+
+/* Form */
+label {
+  display: block;
+  margin-bottom: 10px;
+  font-size: 11px;
+  font-weight: 500;
+  color: #8B8478;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+input, select, textarea {
+  display: block;
+  width: 100%;
+  margin-top: 4px;
+  padding: 8px 10px;
+  background: #fff;
+  border: 1px solid #D4CBC0;
+  border-radius: 6px;
+  color: #2D2B2A;
+  font-size: 13px;
+  font-family: inherit;
+}
+
+input:focus, select:focus, textarea:focus {
+  outline: none;
+  border-color: #DA7756;
+  box-shadow: 0 0 0 2px rgba(218, 119, 86, 0.15);
+}
+
+textarea {
+  resize: vertical;
+}
+
+button[type="submit"], .week-actions button, .history-summary-actions button {
+  width: 100%;
+  padding: 10px;
+  margin-top: 4px;
+  background: #DA7756;
+  border: none;
+  border-radius: 6px;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+button[type="submit"]:hover, .week-actions button:hover, .history-summary-actions button:hover {
+  background: #C96442;
+}
+
+.week-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.week-actions #btn-publish-week {
+  grid-column: 1 / -1;
+}
+
+.secondary-action {
+  background: transparent;
+  color: #8B8478;
+  border: 1px solid #D4CBC0;
+}
+
+.secondary-action:hover {
+  background: #EDE5DA;
+  color: #5A544C;
+}
+
+.status {
+  margin-top: 8px;
+  font-size: 12px;
+  color: #DA7756;
+  text-align: center;
+  min-height: 18px;
+}
+
+.history-notice {
+  margin-bottom: 10px;
+  padding: 10px 12px;
+  background: #fff;
+  border: 1px solid #D4CBC0;
+  border-left: 3px solid #DA7756;
+  border-radius: 6px;
+  color: #6B645C;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.publish-panel {
+  margin-top: 12px;
+}
+
+.publish-panel[hidden] {
+  display: none !important;
+}
+
+/* Week entries list */
+#week-header {
+  font-size: 12px;
+  color: #8B8478;
+  margin-bottom: 8px;
+}
+
+.entry-item {
+  padding: 8px 10px;
+  margin-bottom: 6px;
+  background: #fff;
+  border-radius: 6px;
+  border-left: 3px solid #DA7756;
+}
+
+.entry-item .entry-title {
+  font-weight: 600;
+  color: #2D2B2A;
+  font-size: 13px;
+}
+
+.entry-item .entry-meta {
+  font-size: 11px;
+  color: #8B8478;
+  margin-top: 2px;
+}
+
+.entry-item .entry-note {
+  font-size: 12px;
+  color: #6B645C;
+  margin-top: 4px;
+  font-style: italic;
+}
+
+.entry-item .entry-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.entry-item .entry-actions button {
+  background: none;
+  border: none;
+  color: #8B8478;
+  font-size: 11px;
+  cursor: pointer;
+  padding: 0;
+}
+
+.entry-item .entry-actions button:hover {
+  color: #DA7756;
+}
+
+.entry-item .entry-actions .btn-delete:hover {
+  color: #c44;
+}
+
+.entry-item.editing {
+  border-left-color: #7C9A6E;
+}
+
+/* Edit form */
+.edit-form {
+  padding: 12px;
+  margin: 8px 0;
+  background: #fff;
+  border-radius: 6px;
+  border: 1px solid #D4CBC0;
+}
+
+.edit-form label {
+  margin-bottom: 8px;
+}
+
+.edit-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.edit-actions button {
+  flex: 1;
+  padding: 8px;
+  border: none;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.edit-actions button[type="submit"] {
+  background: #DA7756;
+  color: #fff;
+}
+
+.edit-actions button[type="submit"]:hover {
+  background: #C96442;
+}
+
+.edit-actions button[type="button"] {
+  background: transparent;
+  color: #8B8478;
+  border: 1px solid #D4CBC0;
+}
+
+.edit-actions button[type="button"]:hover {
+  background: #EDE5DA;
+}
+
+.history-week {
+  margin-bottom: 8px;
+  background: #fff;
+  border-radius: 6px;
+  border: 1px solid #D4CBC0;
+}
+
+.history-week summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 12px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.history-week summary::-webkit-details-marker {
+  display: none;
+}
+
+.history-summary-title {
+  color: #2D2B2A;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.history-summary-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.history-summary-actions button {
+  width: auto;
+  margin-top: 0;
+  padding: 5px 8px;
+  font-size: 11px;
+  color: #fff;
+}
+
+.history-summary-actions .secondary-action {
+  background: #DA7756;
+  color: #fff;
+  border: none;
+}
+
+.history-summary-actions .secondary-action:hover {
+  background: #C96442;
+  color: #fff;
+}
+
+.history-entries {
+  padding: 0 12px 12px;
+}
+
+.history-week summary::before {
+  content: "\25B6 ";
+  font-size: 10px;
+  color: #8B8478;
+  margin-right: 6px;
+}
+
+.history-week[open] summary::before {
+  content: "\25BC ";
+}
+
+.history-week .history-entries {
+  padding: 8px 10px;
+}
+
+.history-actions {
+  padding: 0 10px 10px;
+}
+
+.history-export {
+  width: 100%;
+  padding: 8px 10px;
+  background: transparent;
+  color: #8B8478;
+  border: 1px solid #D4CBC0;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.history-export:hover {
+  background: #EDE5DA;
+  color: #5A544C;
+}
+
+.empty {
+  text-align: center;
+  color: #8B8478;
+  padding: 24px 0;
+  font-size: 12px;
+}

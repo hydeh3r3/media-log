@@ -1,0 +1,24 @@
+{
+  "manifest_version": 3,
+  "name": "Media Log",
+  "version": "1.0.0",
+  "description": "Log weekly media consumption for blog posts",
+  "permissions": ["storage", "tabs", "clipboardWrite"],
+  "host_permissions": [
+    "http://127.0.0.1:43187/*",
+    "http://localhost:43187/*"
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  }
+}

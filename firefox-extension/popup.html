@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <header>
+    <h1>Media Log</h1>
+    <nav>
+      <button class="tab active" data-tab="add">Add</button>
+      <button class="tab" data-tab="week">This Week</button>
+      <button class="tab" data-tab="history">History</button>
+    </nav>
+  </header>
+
+  <!-- Add Entry -->
+  <section id="tab-add" class="tab-content active">
+    <form id="entry-form">
+      <label>
+        URL (optional)
+        <input type="url" id="entry-url">
+      </label>
+      <label>
+        Title
+        <input type="text" id="entry-title" required>
+      </label>
+      <label>
+        Type
+        <select id="entry-type">
+          <option value="anime">Anime</option>
+          <option value="article" selected>Article</option>
+          <option value="book">Book</option>
+          <option value="film">Film</option>
+          <option value="game">Game</option>
+          <option value="manga">Manga</option>
+          <option value="music">Music</option>
+          <option value="podcast">Podcast</option>
+          <option value="tv">TV Show</option>
+        </select>
+      </label>
+      <label>
+        Date
+        <input type="date" id="entry-date" required>
+      </label>
+      <label>
+        Rating (1-10)
+        <input type="number" id="entry-rating" min="1" max="10">
+      </label>
+      <label>
+        Note
+        <textarea id="entry-note" rows="2"></textarea>
+      </label>
+      <button type="submit" id="btn-add">Add</button>
+      <div id="add-status" class="status"></div>
+    </form>
+  </section>
+
+  <!-- This Week -->
+  <section id="tab-week" class="tab-content">
+    <div id="week-header"></div>
+    <div id="week-entries"></div>
+
+    <!-- Inline edit form (hidden by default) -->
+    <form id="edit-form" class="edit-form" style="display:none">
+      <label>
+        Title
+        <input type="text" id="edit-title" required>
+      </label>
+      <label>
+        URL (optional)
+        <input type="url" id="edit-url">
+      </label>
+      <label>
+        Type
+        <select id="edit-type">
+          <option value="anime">Anime</option>
+          <option value="article" selected>Article</option>
+          <option value="book">Book</option>
+          <option value="film">Film</option>
+          <option value="game">Game</option>
+          <option value="manga">Manga</option>
+          <option value="music">Music</option>
+          <option value="podcast">Podcast</option>
+          <option value="tv">TV Show</option>
+        </select>
+      </label>
+      <label>
+        Date
+        <input type="date" id="edit-date" required>
+      </label>
+      <label>
+        Rating (1-10)
+        <input type="number" id="edit-rating" min="1" max="10">
+      </label>
+      <label>
+        Note
+        <textarea id="edit-note" rows="2"></textarea>
+      </label>
+      <div class="edit-actions">
+        <button type="submit">Save</button>
+        <button type="button" id="edit-cancel">Cancel</button>
+      </div>
+    </form>
+
+    <div class="week-actions">
+      <button id="btn-publish-week">Publish to Website</button>
+      <button id="btn-end-week" class="secondary-action">End Week</button>
+      <button id="btn-new-week" class="secondary-action">Start New Week</button>
+    </div>
+    <div id="week-publish-status" class="status"></div>
+  </section>
+
+  <!-- History -->
+  <section id="tab-history" class="tab-content">
+    <div id="history-notice" class="history-notice" hidden></div>
+    <div id="history-list"></div>
+    <div id="history-empty" class="empty">No archived weeks yet.</div>
+    <div id="history-publish-status" class="status"></div>
+  </section>
+
+  <script src="popup.js"></script>
+</body>
+</html>
