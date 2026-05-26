@@ -119,3 +119,5 @@ The repo now has two sync paths:
 - Production: `supabase/functions/media-log-sync/index.ts`
 
 The production path uses Supabase Auth, a row owned by the signed-in user, row-level security, and a server-side merge before write.
+
+`bun run verify` now runs a safe local sync smoke test. It starts the local sync server on a temporary port, writes one synthetic entry, reads it back, and deletes the temporary file.

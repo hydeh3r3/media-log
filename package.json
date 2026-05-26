@@ -7,6 +7,7 @@
     "check:chrome": "node --check chrome-extension/popup.js",
     "check:firefox": "node --check firefox-extension/popup.js",
     "check:ios": "xcodebuild -project iphone-app/MediaLog.xcodeproj -scheme MediaLog -destination 'generic/platform=iOS Simulator' build",
+    "check:sync": "bun run scripts/sync-smoke-test.js",
     "check:supabase": "node --check scripts/check-supabase-backend.js && bun run scripts/check-supabase-backend.js",
     "lint:chrome": "bun run scripts/lint-chrome-extension.js",
     "lint:firefox": "bunx --bun web-ext lint --source-dir firefox-extension",
@@ -15,6 +16,6 @@
     "supabase:deploy": "bunx supabase db push && bunx supabase functions deploy media-log-sync",
     "sync:dev": "bun run scripts/sync-dev-server.js",
     "verify:chrome": "bun run check:chrome && bun run lint:chrome && bun run package:chrome",
-    "verify": "bun run verify:chrome && bun run check:supabase && bun run check:ios"
+    "verify": "bun run verify:chrome && bun run check:supabase && bun run check:sync && bun run check:ios"
   }
 }

@@ -72,6 +72,16 @@ The local dev server uses a simple token. Production uses Supabase Auth and row-
 
 Production clients sign in with Supabase email/password auth, then use the returned access token for sync requests. Refresh tokens are used to renew the session before sync.
 
+## Verification
+
+Run:
+
+```sh
+bun run check:sync
+```
+
+This starts the local sync server on a temporary port, syncs one safe synthetic entry, reads it back, and deletes the temporary data file.
+
 ## Offline Merge
 
 Clients merge before they upload:
