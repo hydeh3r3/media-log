@@ -12,6 +12,7 @@ const ENTRY_TYPES = {
 };
 const SELECTABLE_ENTRY_TYPES = new Set(["anime", "article", "book", "film", "game", "manga", "music", "podcast", "tv"]);
 const DEFAULT_ENTRY_TYPE = "article";
+const STORAGE_KEYS = ["currentWeek", "history", "addDraft", "syncConfig", "syncState", "syncTombstones"];
 
 const MONTHS = [
   "January",
@@ -27,7 +28,6 @@ const MONTHS = [
   "November",
   "December",
 ];
-const BRIDGE_URLS = ["http://127.0.0.1:43187", "http://localhost:43187"];
 
 // --- ISO week utilities ---
 
@@ -113,41 +113,15 @@ function normalizeCreatedAt(data) {
 // --- Storage helpers ---
 
 async function getStorage() {
-  return chrome.storage.local.get(["currentWeek", "history", "addDraft"]);
+  return chrome.storage.local.get(STORAGE_KEYS);
 }
 
 async function setStorage(data) {
   return chrome.storage.local.set(data);
 }
 
-function getPublishElements(scope) {
-  return {
-    status: document.getElementById(`${scope}-publish-status`),
-  };
-}
-
-function showPublishStatus(scope, message, isError = false) {
-  const { status } = getPublishElements(scope);
-  status.textContent = message;
-  status.style.color = isError ? "#C44" : "#DA7756";
-}
-
 function getErrorMessage(error) {
   return error instanceof Error ? error.message : "Something went wrong.";
-}
-
-function showXOutput(scope, title) {
-  showPublishStatus(scope, `Prepared X version for "${title}"`);
-}
-
-function hideXOutput(scope) {
-  const { status } = getPublishElements(scope);
-  status.textContent = "";
-}
-
-function hideAllXOutputs() {
-  hideXOutput("week");
-  hideXOutput("history");
 }
 
 function getAddDraft() {
@@ -158,6 +132,7 @@ function getAddDraft() {
     date: document.getElementById("entry-date").value,
     rating: document.getElementById("entry-rating").value,
     note: document.getElementById("entry-note").value,
+    updatedAt: new Date().toISOString(),
   };
 }
 
@@ -352,10 +327,12 @@ function inferTypeFromTab(tab) {
 
 async function saveAddDraft() {
   await setStorage({ addDraft: getAddDraft() });
+  await markSyncDirty("draft");
 }
 
 async function clearAddDraft() {
   await chrome.storage.local.remove("addDraft");
+  await markSyncDirty("draft-cleared");
 }
 
 async function restoreAddDraft() {
@@ -369,38 +346,6 @@ async function restoreAddDraft() {
   document.getElementById("entry-rating").value = addDraft.rating || "";
   document.getElementById("entry-note").value = addDraft.note || "";
   return true;
-}
-
-async function publishWeekToWebsite(weekData) {
-  const payload = {
-    weekNumber: weekData.weekNumber,
-    year: weekData.year,
-    weekStart: weekData.weekStart,
-    weekEnd: weekData.weekEnd,
-    entries: weekData.entries,
-  };
-
-  let lastError = "Publish bridge is not running.";
-  for (const baseUrl of BRIDGE_URLS) {
-    try {
-      const response = await fetch(`${baseUrl}/publish`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-      const result = await response.json();
-
-      if (!response.ok || !result.ok) {
-        throw new Error(result.error || `Publish failed with ${response.status}`);
-      }
-
-      return result;
-    } catch (error) {
-      lastError = error instanceof Error ? error.message : "Publish failed.";
-    }
-  }
-
-  throw new Error(`${lastError} Run "bun run publish:bridge" in the website repo first.`);
 }
 
 function sortEntries(entries) {
@@ -417,6 +362,226 @@ function sortEntries(entries) {
     .map(({ entry }) => entry);
 
   entries.splice(0, entries.length, ...sorted);
+}
+
+function createId() {
+  if (crypto.randomUUID) {
+    return crypto.randomUUID();
+  }
+  return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
+
+function weekKey(week) {
+  return `${week.year}-W${String(week.weekNumber).padStart(2, "0")}`;
+}
+
+function timestampValue(value) {
+  const parsed = Date.parse(value || "");
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function newestTimestamp(a, b) {
+  return timestampValue(a) >= timestampValue(b) ? a : b;
+}
+
+function cloneSnapshot(data) {
+  return JSON.parse(
+    JSON.stringify({
+      currentWeek: data.currentWeek || null,
+      history: data.history || [],
+      addDraft: data.addDraft || null,
+      tombstones: data.syncTombstones || data.tombstones || {},
+    }),
+  );
+}
+
+function ensureEntryMetadata(entry) {
+  let changed = false;
+  if (!entry.id) {
+    entry.id = createId();
+    changed = true;
+  }
+  if (!entry.createdAt) {
+    entry.createdAt = new Date().toISOString();
+    changed = true;
+  }
+  if (!entry.updatedAt) {
+    entry.updatedAt = entry.createdAt;
+    changed = true;
+  }
+  return changed;
+}
+
+function normalizeSnapshot(snapshot) {
+  let changed = false;
+  const normalizeEntries = (entries = []) => {
+    for (const entry of entries) {
+      if (ensureEntryMetadata(entry)) {
+        changed = true;
+      }
+    }
+  };
+
+  normalizeEntries(snapshot.currentWeek?.entries);
+  for (const week of snapshot.history || []) {
+    normalizeEntries(week.entries);
+  }
+
+  if (snapshot.addDraft && !snapshot.addDraft.updatedAt) {
+    snapshot.addDraft.updatedAt = new Date().toISOString();
+    changed = true;
+  }
+
+  snapshot.tombstones = snapshot.tombstones || {};
+  return changed;
+}
+
+function getSnapshotFromStorage(data) {
+  const snapshot = cloneSnapshot(data);
+  normalizeSnapshot(snapshot);
+  return snapshot;
+}
+
+function mergeDraft(localDraft, remoteDraft) {
+  if (!localDraft) return remoteDraft || null;
+  if (!remoteDraft) return localDraft;
+  return timestampValue(localDraft.updatedAt) >= timestampValue(remoteDraft.updatedAt) ? localDraft : remoteDraft;
+}
+
+function mergeTombstones(localTombstones = {}, remoteTombstones = {}) {
+  const tombstones = { ...remoteTombstones };
+  for (const [entryId, deletedAt] of Object.entries(localTombstones)) {
+    tombstones[entryId] = newestTimestamp(deletedAt, tombstones[entryId]);
+  }
+  return tombstones;
+}
+
+function addWeekToMap(map, week) {
+  if (!week) return;
+  const key = weekKey(week);
+  const existing = map.get(key);
+  if (!existing) {
+    map.set(key, { ...week, entries: [...(week.entries || [])] });
+    return;
+  }
+
+  existing.weekStart = existing.weekStart || week.weekStart;
+  existing.weekEnd = existing.weekEnd || week.weekEnd;
+  existing.entries.push(...(week.entries || []));
+}
+
+function mergeWeekEntries(entries, tombstones) {
+  const byId = new Map();
+  for (const entry of entries) {
+    const existing = byId.get(entry.id);
+    if (!existing || timestampValue(entry.updatedAt) >= timestampValue(existing.updatedAt)) {
+      byId.set(entry.id, entry);
+    }
+  }
+
+  const merged = [];
+  for (const entry of byId.values()) {
+    const deletedAt = tombstones[entry.id];
+    if (deletedAt && timestampValue(deletedAt) >= timestampValue(entry.updatedAt)) {
+      continue;
+    }
+    merged.push(entry);
+  }
+
+  sortEntries(merged);
+  return merged;
+}
+
+function mergeSnapshots(localSnapshot, remoteSnapshot) {
+  if (!remoteSnapshot) return localSnapshot;
+
+  normalizeSnapshot(localSnapshot);
+  normalizeSnapshot(remoteSnapshot);
+
+  const tombstones = mergeTombstones(localSnapshot.tombstones, remoteSnapshot.tombstones);
+  const weeks = new Map();
+
+  addWeekToMap(weeks, remoteSnapshot.currentWeek);
+  for (const week of remoteSnapshot.history || []) addWeekToMap(weeks, week);
+  addWeekToMap(weeks, localSnapshot.currentWeek);
+  for (const week of localSnapshot.history || []) addWeekToMap(weeks, week);
+
+  for (const week of weeks.values()) {
+    week.entries = mergeWeekEntries(week.entries || [], tombstones);
+  }
+
+  const currentKey = localSnapshot.currentWeek
+    ? weekKey(localSnapshot.currentWeek)
+    : remoteSnapshot.currentWeek
+      ? weekKey(remoteSnapshot.currentWeek)
+      : null;
+  const currentWeek = currentKey ? weeks.get(currentKey) || null : null;
+  const history = [...weeks.entries()]
+    .filter(([key]) => key !== currentKey)
+    .map(([, week]) => week)
+    .sort((a, b) => b.year - a.year || b.weekNumber - a.weekNumber);
+
+  return {
+    currentWeek,
+    history,
+    addDraft: mergeDraft(localSnapshot.addDraft, remoteSnapshot.addDraft),
+    tombstones,
+  };
+}
+
+async function getClientId(syncState = null) {
+  const state = syncState || (await getStorage()).syncState || {};
+  if (state.clientId) return state.clientId;
+  return createId();
+}
+
+async function markSyncDirty(reason) {
+  const data = await getStorage();
+  const now = new Date().toISOString();
+  const syncState = {
+    ...(data.syncState || {}),
+    clientId: await getClientId(data.syncState || {}),
+    dirtyAt: now,
+    dirtyReason: reason,
+  };
+  await setStorage({ syncState });
+}
+
+async function saveSnapshot(snapshot, syncStatePatch = {}) {
+  const syncState = {
+    ...(await getStorage()).syncState,
+    ...syncStatePatch,
+  };
+  await setStorage({
+    currentWeek: snapshot.currentWeek,
+    history: snapshot.history || [],
+    addDraft: snapshot.addDraft || null,
+    syncTombstones: snapshot.tombstones || {},
+    syncState,
+  });
+}
+
+function createTextElement(tagName, className, text) {
+  const element = document.createElement(tagName);
+  if (className) {
+    element.className = className;
+  }
+  element.textContent = text;
+  return element;
+}
+
+function getEntryMeta(entry, includeDate = false) {
+  let meta = ENTRY_TYPES[entry.type] || entry.type;
+  if (entry.rating) meta += ` — ${entry.rating}/10`;
+  if (includeDate) meta += ` — ${entry.date}`;
+  return meta;
+}
+
+function createEntryItem(entry) {
+  const item = document.createElement("div");
+  item.className = "entry-item";
+  item.appendChild(createTextElement("div", "entry-title", entry.title));
+  return item;
 }
 
 function ensureHistoryWeek(data, weekInfo) {
@@ -465,20 +630,25 @@ async function ensureCurrentWeek() {
   const { start, end } = getWeekBounds(year, week);
   const data = await getStorage();
   const createdAtNormalized = normalizeCreatedAt(data);
+  const snapshot = getSnapshotFromStorage(data);
+  const metadataNormalized = JSON.stringify(snapshot) !== JSON.stringify(cloneSnapshot(data));
 
   if (data.currentWeek?.weekNumber === week && data.currentWeek.year === year) {
-    if (createdAtNormalized) {
-      await setStorage({ currentWeek: data.currentWeek, history: data.history || [] });
+    if (createdAtNormalized || metadataNormalized) {
+      await saveSnapshot(snapshot, {
+        ...(data.syncState || {}),
+        clientId: await getClientId(data.syncState || {}),
+      });
     }
-    return { ...data, archivedWeek: null };
+    return { ...data, ...snapshot, archivedWeek: null };
   }
 
   // Auto-archive stale week
-  const history = data.history || [];
+  const history = snapshot.history || [];
   let archivedWeek = null;
-  if (data.currentWeek?.entries && data.currentWeek.entries.length > 0) {
-    archivedWeek = data.currentWeek;
-    history.unshift(data.currentWeek);
+  if (snapshot.currentWeek?.entries && snapshot.currentWeek.entries.length > 0) {
+    archivedWeek = snapshot.currentWeek;
+    history.unshift(snapshot.currentWeek);
   }
 
   const currentWeek = {
@@ -489,8 +659,150 @@ async function ensureCurrentWeek() {
     entries: [],
   };
 
-  await setStorage({ currentWeek, history });
-  return { currentWeek, history, archivedWeek };
+  await saveSnapshot({ ...snapshot, currentWeek, history }, {
+    ...(data.syncState || {}),
+    clientId: await getClientId(data.syncState || {}),
+    dirtyAt: new Date().toISOString(),
+    dirtyReason: "week-rollover",
+  });
+  return { ...snapshot, currentWeek, history, archivedWeek };
+}
+
+function normalizeEndpoint(endpoint) {
+  const url = new URL(endpoint);
+  const path = url.pathname.replace(/\/$/, "");
+  if (!path.endsWith("/media-log")) {
+    url.pathname = `${path}/v1/media-log`;
+  }
+  url.search = "";
+  url.hash = "";
+  return url.toString();
+}
+
+function syncResourceUrl(endpoint, userId) {
+  const url = new URL(normalizeEndpoint(endpoint));
+  url.searchParams.set("userId", userId || "personal");
+  return url.toString();
+}
+
+async function requestSyncHostPermission(endpoint) {
+  if (!chrome.permissions?.contains || !chrome.permissions?.request) {
+    return true;
+  }
+
+  const endpointUrl = new URL(endpoint);
+  const originPattern = `${endpointUrl.protocol}//${endpointUrl.hostname}/*`;
+  const hasPermission = await chrome.permissions.contains({ origins: [originPattern] });
+  if (hasPermission) {
+    return true;
+  }
+
+  return chrome.permissions.request({ origins: [originPattern] });
+}
+
+async function fetchSyncRecord(config) {
+  const response = await fetch(syncResourceUrl(config.endpoint, config.userId), {
+    headers: {
+      Authorization: `Bearer ${config.token}`,
+    },
+  });
+  const result = await response.json();
+
+  if (!response.ok || !result.ok) {
+    throw new Error(result.error || `Sync pull failed with ${response.status}`);
+  }
+
+  return result.record;
+}
+
+async function pushSyncRecord(config, clientId, snapshot) {
+  const response = await fetch(normalizeEndpoint(config.endpoint), {
+    method: "PUT",
+    headers: {
+      Authorization: `Bearer ${config.token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      userId: config.userId || "personal",
+      clientId,
+      data: snapshot,
+    }),
+  });
+  const result = await response.json();
+
+  if (!response.ok || !result.ok) {
+    throw new Error(result.error || `Sync push failed with ${response.status}`);
+  }
+
+  return result.record;
+}
+
+function getSyncConfigFromForm() {
+  return {
+    endpoint: document.getElementById("sync-endpoint").value.trim(),
+    userId: document.getElementById("sync-user-id").value.trim() || "personal",
+    token: document.getElementById("sync-token").value,
+  };
+}
+
+function showSyncStatus(message, isError = false) {
+  const status = document.getElementById("sync-status");
+  status.textContent = message;
+  status.style.color = isError ? "#C44" : "#DA7756";
+}
+
+function renderSyncSummary(data) {
+  const currentEntries = data.currentWeek?.entries?.length || 0;
+  const historyWeeks = data.history?.length || 0;
+  const historyEntries = (data.history || []).reduce((sum, week) => sum + (week.entries?.length || 0), 0);
+  const lastSyncedAt = data.syncState?.lastSyncedAt ? new Date(data.syncState.lastSyncedAt).toLocaleString() : "Never";
+  const dirtyText = data.syncState?.dirtyAt ? "Local changes waiting to sync" : "No local changes waiting";
+
+  document.getElementById("sync-summary").textContent =
+    `Current entries: ${currentEntries}\nArchived weeks: ${historyWeeks}\nArchived entries: ${historyEntries}\nLast sync: ${lastSyncedAt}\n${dirtyText}`;
+}
+
+async function restoreSyncSettings() {
+  const data = await getStorage();
+  const config = data.syncConfig || {};
+  document.getElementById("sync-endpoint").value = config.endpoint || "";
+  document.getElementById("sync-user-id").value = config.userId || "personal";
+  document.getElementById("sync-token").value = config.token || "";
+  renderSyncSummary(data);
+}
+
+async function syncNow() {
+  const data = await ensureCurrentWeek();
+  const config = data.syncConfig || getSyncConfigFromForm();
+
+  if (!config.endpoint || !config.token) {
+    throw new Error("Add a sync endpoint and token first.");
+  }
+
+  const endpoint = normalizeEndpoint(config.endpoint);
+  const allowed = await requestSyncHostPermission(endpoint);
+  if (!allowed) {
+    throw new Error("Sync host permission was not granted.");
+  }
+
+  const clientId = await getClientId(data.syncState || {});
+  const localSnapshot = getSnapshotFromStorage(data);
+  const remoteRecord = await fetchSyncRecord({ ...config, endpoint });
+  const mergedSnapshot = mergeSnapshots(localSnapshot, remoteRecord.data);
+  const savedRecord = await pushSyncRecord({ ...config, endpoint }, clientId, mergedSnapshot);
+  const returnedSnapshot = savedRecord.data || mergedSnapshot;
+  const now = new Date().toISOString();
+
+  await saveSnapshot(returnedSnapshot, {
+    ...(data.syncState || {}),
+    clientId,
+    lastRevision: savedRecord.revision,
+    lastSyncedAt: now,
+    dirtyAt: null,
+    dirtyReason: null,
+  });
+
+  return savedRecord;
 }
 
 // --- Tab switching ---
@@ -501,6 +813,7 @@ for (const btn of document.querySelectorAll(".tab")) {
 
     if (btn.dataset.tab === "week") renderWeek();
     if (btn.dataset.tab === "history") renderHistory();
+    if (btn.dataset.tab === "sync") restoreSyncSettings();
   });
 }
 
@@ -557,11 +870,14 @@ document.getElementById("entry-form").addEventListener("submit", async (e) => {
 
   if (!title || !date) return;
 
+  const now = new Date().toISOString();
   const entry = {
+    id: createId(),
     type,
     title,
     date,
-    createdAt: new Date().toISOString(),
+    createdAt: now,
+    updatedAt: now,
   };
   if (url) entry.url = url;
   if (rating) entry.rating = Number.parseInt(rating, 10);
@@ -570,6 +886,7 @@ document.getElementById("entry-form").addEventListener("submit", async (e) => {
   const data = await ensureCurrentWeek();
   const { targetWeek } = placeEntryInWeek(data, entry);
   await setStorage({ currentWeek: data.currentWeek, history: data.history || [] });
+  await markSyncDirty("entry-added");
   await clearAddDraft();
 
   // Reset form for the next entry
@@ -599,45 +916,49 @@ async function renderWeek() {
 
   const container = document.getElementById("week-entries");
   if (cw.entries.length === 0) {
-    container.innerHTML = '<div class="empty">No entries yet.</div>';
+    container.replaceChildren(createTextElement("div", "empty", "No entries yet."));
     return;
   }
 
-  container.innerHTML = cw.entries
-    .map((e, i) => {
-      let meta = ENTRY_TYPES[e.type] || e.type;
-      if (e.rating) meta += ` — ${e.rating}/10`;
-      meta += ` — ${e.date}`;
-      const noteHtml = e.note ? `<div class="entry-note">${escapeHtml(e.note)}</div>` : "";
-      return `<div class="entry-item" data-index="${i}">
-        <div class="entry-title">${escapeHtml(e.title)}</div>
-        <div class="entry-meta">${escapeHtml(meta)}</div>
-        ${noteHtml}
-        <div class="entry-actions">
-          <button type="button" class="btn-edit" data-index="${i}">edit</button>
-          <button type="button" class="btn-delete" data-index="${i}">delete</button>
-        </div>
-      </div>`;
-    })
-    .join("");
+  container.replaceChildren();
+  cw.entries.forEach((entry, index) => {
+    const item = createEntryItem(entry);
+    item.dataset.index = String(index);
+    item.appendChild(createTextElement("div", "entry-meta", getEntryMeta(entry, true)));
 
-  // Bind edit buttons
-  for (const btn of container.querySelectorAll(".btn-edit")) {
-    btn.addEventListener("click", (event) => {
+    if (entry.note) {
+      item.appendChild(createTextElement("div", "entry-note", entry.note));
+    }
+
+    const actions = document.createElement("div");
+    actions.className = "entry-actions";
+
+    const editButton = document.createElement("button");
+    editButton.type = "button";
+    editButton.className = "btn-edit";
+    editButton.dataset.index = String(index);
+    editButton.textContent = "edit";
+    editButton.addEventListener("click", (event) => {
       event.preventDefault();
       event.stopPropagation();
-      startEdit(Number.parseInt(btn.dataset.index, 10));
+      startEdit(index);
     });
-  }
 
-  // Bind delete buttons
-  for (const btn of container.querySelectorAll(".btn-delete")) {
-    btn.addEventListener("click", async (event) => {
+    const deleteButton = document.createElement("button");
+    deleteButton.type = "button";
+    deleteButton.className = "btn-delete";
+    deleteButton.dataset.index = String(index);
+    deleteButton.textContent = "delete";
+    deleteButton.addEventListener("click", async (event) => {
       event.preventDefault();
       event.stopPropagation();
-      await deleteEntry(Number.parseInt(btn.dataset.index, 10));
+      await deleteEntry(index);
     });
-  }
+
+    actions.append(editButton, deleteButton);
+    item.appendChild(actions);
+    container.appendChild(item);
+  });
 }
 
 // --- Edit / Delete ---
@@ -695,10 +1016,12 @@ document.getElementById("edit-form").addEventListener("submit", async (e) => {
   if (!entry) return;
 
   const updatedEntry = {
+    id: entry.id || createId(),
     type: document.getElementById("edit-type").value,
     title: document.getElementById("edit-title").value.trim(),
     date: document.getElementById("edit-date").value,
-    createdAt: entry.createdAt,
+    createdAt: entry.createdAt || new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
   };
   const url = document.getElementById("edit-url").value.trim();
   if (url) {
@@ -717,6 +1040,7 @@ document.getElementById("edit-form").addEventListener("submit", async (e) => {
   const { movedToCurrentWeek } = placeEntryInWeek(data, updatedEntry);
 
   await setStorage({ currentWeek: data.currentWeek, history: data.history || [] });
+  await markSyncDirty("entry-edited");
   hideEditForm();
 
   if (movedToCurrentWeek) {
@@ -736,7 +1060,12 @@ async function deleteEntry(index) {
   if (!entry) return;
 
   data.currentWeek.entries.splice(index, 1);
-  await setStorage({ currentWeek: data.currentWeek });
+  const syncTombstones = {
+    ...(data.syncTombstones || {}),
+    [entry.id || createId()]: new Date().toISOString(),
+  };
+  await setStorage({ currentWeek: data.currentWeek, syncTombstones });
+  await markSyncDirty("entry-deleted");
   hideEditForm();
   renderWeek();
 }
@@ -764,29 +1093,14 @@ function downloadWeekExport(weekData) {
   URL.revokeObjectURL(url);
 }
 
-// --- End Week (Export) ---
+// --- Export and Week Control ---
 
-document.getElementById("btn-end-week").addEventListener("click", async () => {
+document.getElementById("btn-export-week").addEventListener("click", async () => {
   const data = await ensureCurrentWeek();
   downloadWeekExport(data.currentWeek);
 });
 
-document.getElementById("btn-publish-week").addEventListener("click", async () => {
-  const data = await ensureCurrentWeek();
-
-  try {
-    hideXOutput("week");
-    showPublishStatus("week", "Publishing current week...");
-    const result = await publishWeekToWebsite(data.currentWeek);
-    showPublishStatus("week", `Published "${result.title}" to website files.`);
-  } catch (error) {
-    showPublishStatus("week", getErrorMessage(error), true);
-  }
-});
-
-// --- Start New Week ---
-
-document.getElementById("btn-new-week").addEventListener("click", async () => {
+async function startFreshWeek() {
   const data = await ensureCurrentWeek();
   const history = data.history || [];
 
@@ -805,7 +1119,16 @@ document.getElementById("btn-new-week").addEventListener("click", async () => {
   };
 
   await setStorage({ currentWeek, history });
+  await markSyncDirty("week-started");
   renderWeek();
+}
+
+document.getElementById("btn-end-week").addEventListener("click", startFreshWeek);
+
+// --- Start New Week ---
+
+document.getElementById("btn-new-week").addEventListener("click", async () => {
+  await startFreshWeek();
 });
 
 // --- History ---
@@ -826,68 +1149,90 @@ async function renderHistory() {
   }
 
   if (history.length === 0) {
-    container.innerHTML = "";
+    container.replaceChildren();
     empty.style.display = "block";
     return;
   }
 
   empty.style.display = "none";
-  container.innerHTML = history
-    .map((w, index) => {
-      const { start, end } = getWeekBounds(w.year, w.weekNumber);
-      const entriesHtml = w.entries
-        .map((e) => {
-          let meta = ENTRY_TYPES[e.type] || e.type;
-          if (e.rating) meta += ` — ${e.rating}/10`;
-          return `<div class="entry-item">
-            <div class="entry-title">${escapeHtml(e.title)}</div>
-            <div class="entry-meta">${escapeHtml(meta)}</div>
-          </div>`;
-        })
-        .join("");
+  container.replaceChildren();
+  history.forEach((weekData, index) => {
+    const { start, end } = getWeekBounds(weekData.year, weekData.weekNumber);
+    const details = document.createElement("details");
+    details.className = "history-week";
 
-      return `<details class="history-week">
-        <summary>
-          <span class="history-summary-title">Week ${w.weekNumber}, ${w.year} (${formatDateRange(start, end)}) — ${w.entries.length} entries</span>
-          <span class="history-summary-actions">
-            <button class="history-publish" data-index="${index}">Publish</button>
-          </span>
-        </summary>
-        <div class="history-entries">${entriesHtml}</div>
-      </details>`;
-    })
-    .join("");
+    const summary = document.createElement("summary");
+    const title = createTextElement(
+      "span",
+      "history-summary-title",
+      `Week ${weekData.weekNumber}, ${weekData.year} (${formatDateRange(start, end)}) — ${weekData.entries.length} entries`,
+    );
 
-  for (const button of container.querySelectorAll(".history-publish")) {
-    button.addEventListener("click", async (event) => {
+    const actions = document.createElement("span");
+    actions.className = "history-summary-actions";
+
+    const exportButton = document.createElement("button");
+    exportButton.className = "history-export";
+    exportButton.dataset.index = String(index);
+    exportButton.textContent = "Export";
+    exportButton.addEventListener("click", (event) => {
       event.preventDefault();
       event.stopPropagation();
-      const index = Number(button.dataset.index);
-      const weekData = history[index];
-
-      if (!weekData) {
-        return;
-      }
-
-      try {
-        hideXOutput("history");
-        showPublishStatus("history", `Publishing Week ${weekData.weekNumber}...`);
-        const result = await publishWeekToWebsite(weekData);
-        showPublishStatus("history", `Published "${result.title}" to website files.`);
-      } catch (error) {
-        showPublishStatus("history", getErrorMessage(error), true);
-      }
+      downloadWeekExport(weekData);
     });
+
+    actions.appendChild(exportButton);
+    summary.append(title, actions);
+
+    const entries = document.createElement("div");
+    entries.className = "history-entries";
+    for (const entry of weekData.entries) {
+      const item = createEntryItem(entry);
+      item.appendChild(createTextElement("div", "entry-meta", getEntryMeta(entry)));
+      entries.appendChild(item);
+    }
+
+    details.append(summary, entries);
+    container.appendChild(details);
+  });
+}
+
+// --- Sync ---
+
+document.getElementById("sync-form").addEventListener("submit", async (event) => {
+  event.preventDefault();
+
+  try {
+    const config = getSyncConfigFromForm();
+    if (!config.endpoint || !config.token) {
+      throw new Error("Endpoint and token are required.");
+    }
+
+    config.endpoint = normalizeEndpoint(config.endpoint);
+    const allowed = await requestSyncHostPermission(config.endpoint);
+    if (!allowed) {
+      throw new Error("Sync host permission was not granted.");
+    }
+
+    await setStorage({ syncConfig: config });
+    await restoreSyncSettings();
+    showSyncStatus("Sync settings saved.");
+  } catch (error) {
+    showSyncStatus(getErrorMessage(error), true);
   }
-}
+});
 
-// --- Utility ---
-
-function escapeHtml(str) {
-  const div = document.createElement("div");
-  div.textContent = str;
-  return div.innerHTML;
-}
+document.getElementById("btn-sync-now").addEventListener("click", async () => {
+  try {
+    showSyncStatus("Syncing...");
+    const record = await syncNow();
+    const data = await getStorage();
+    renderSyncSummary(data);
+    showSyncStatus(`Synced revision ${record.revision}.`);
+  } catch (error) {
+    showSyncStatus(getErrorMessage(error), true);
+  }
+});
 
 // --- Init ---
 
@@ -901,6 +1246,7 @@ async function init() {
   }
 
   const restoredDraft = await restoreAddDraft();
+  await restoreSyncSettings();
   await prefillFromTab({ preserveDraftType: restoredDraft });
 }
 

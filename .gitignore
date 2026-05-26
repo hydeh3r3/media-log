@@ -14,8 +14,11 @@
 node_modules/
 .bun/
 .venv/
+.swiftpm/
+.build/
 __pycache__/
 .pytest_cache/
+dist/
 
 # Logs and local databases
 *.log
@@ -23,6 +26,7 @@ __pycache__/
 *.sqlite-*
 *.db
 *.db-*
+.local-sync/
 
 # Extension build output and local browser storage exports
 web-ext-artifacts/

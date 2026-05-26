@@ -11,6 +11,7 @@
       <button class="tab active" data-tab="add">Add</button>
       <button class="tab" data-tab="week">This Week</button>
       <button class="tab" data-tab="history">History</button>
+      <button class="tab" data-tab="sync">Sync</button>
     </nav>
   </header>
 
@@ -104,11 +105,10 @@
     </form>
 
     <div class="week-actions">
-      <button id="btn-publish-week">Publish to Website</button>
+      <button id="btn-export-week">Export Week JSON</button>
       <button id="btn-end-week" class="secondary-action">End Week</button>
       <button id="btn-new-week" class="secondary-action">Start New Week</button>
     </div>
-    <div id="week-publish-status" class="status"></div>
   </section>
 
   <!-- History -->
@@ -116,7 +116,30 @@
     <div id="history-notice" class="history-notice" hidden></div>
     <div id="history-list"></div>
     <div id="history-empty" class="empty">No archived weeks yet.</div>
-    <div id="history-publish-status" class="status"></div>
+  </section>
+
+  <!-- Sync -->
+  <section id="tab-sync" class="tab-content">
+    <form id="sync-form">
+      <label>
+        Sync endpoint
+        <input type="url" id="sync-endpoint" placeholder="https://project.supabase.co/functions/v1/media-log">
+      </label>
+      <label>
+        User ID
+        <input type="text" id="sync-user-id" placeholder="personal">
+      </label>
+      <label>
+        Bearer token
+        <input type="password" id="sync-token" autocomplete="off">
+      </label>
+      <button type="submit">Save Sync Settings</button>
+    </form>
+    <div class="sync-actions">
+      <button id="btn-sync-now">Sync Now</button>
+    </div>
+    <div id="sync-summary" class="sync-summary"></div>
+    <div id="sync-status" class="status"></div>
   </section>
 
   <script src="popup.js"></script>

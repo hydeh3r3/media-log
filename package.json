@@ -1,0 +1,18 @@
+{
+  "name": "media-log",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "check:chrome": "node --check chrome-extension/popup.js",
+    "check:firefox": "node --check firefox-extension/popup.js",
+    "check:ios": "cd iphone-app && xcodebuild -scheme MediaLog -destination 'generic/platform=iOS Simulator' build",
+    "lint:chrome": "bun run scripts/lint-chrome-extension.js",
+    "lint:firefox": "bunx --bun web-ext lint --source-dir firefox-extension",
+    "build:chrome": "bun run scripts/build-chrome-release.js",
+    "package:chrome": "bun run build:chrome",
+    "sync:dev": "bun run scripts/sync-dev-server.js",
+    "verify:chrome": "bun run check:chrome && bun run lint:chrome && bun run package:chrome",
+    "verify": "bun run verify:chrome && bun run check:ios"
+  }
+}

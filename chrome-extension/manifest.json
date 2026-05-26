@@ -2,11 +2,12 @@
   "manifest_version": 3,
   "name": "Media Log",
   "version": "1.0.0",
-  "description": "Log weekly media consumption for blog posts",
-  "permissions": ["storage", "tabs", "clipboardWrite"],
-  "host_permissions": [
-    "http://127.0.0.1:43187/*",
-    "http://localhost:43187/*"
+  "description": "Save and sync a weekly log of what you read, watch, play, and hear.",
+  "permissions": ["storage", "activeTab"],
+  "optional_host_permissions": [
+    "https://*.supabase.co/*",
+    "http://127.0.0.1/*",
+    "http://localhost/*"
   ],
   "action": {
     "default_popup": "popup.html",

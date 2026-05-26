@@ -1,14 +1,33 @@
-# iPhone App Placeholder
+# Media Log iOS App
 
-This folder is reserved for the iPhone app.
+This folder contains the SwiftUI companion app source.
 
-Recommended first version:
+It can:
 
-- SwiftUI app
-- local storage
-- add/edit/delete media entries
-- this week view
-- history view
-- JSON export and import
+- show this week's entries
+- add, edit, and delete entries
+- show archived weeks
+- save data on device
+- sync with the same JSON endpoint as the Chrome extension
 
-Read `../handoff.md` for the current extension behavior and data model.
+## Build Check
+
+Run:
+
+`xcodebuild -scheme MediaLog -destination "generic/platform=iOS Simulator" build`
+
+This checks the SwiftUI app target from the Swift Package.
+
+## Dev Sync
+
+Run the local sync server from the repo root:
+
+`bun run sync:dev`
+
+Then use these settings in the app:
+
+- Endpoint: `http://127.0.0.1:43189`
+- User ID: `personal`
+- Token: `dev-media-log-token`
+
+The local sync file is ignored.
