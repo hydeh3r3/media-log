@@ -99,12 +99,55 @@ struct MediaLogSnapshot: Codable, Equatable {
     }
 }
 
+enum SyncMode: String, CaseIterable, Codable, Identifiable {
+    case supabase
+    case local
+
+    var id: String { rawValue }
+
+    var label: String {
+        switch self {
+        case .supabase: "Supabase"
+        case .local: "Local dev"
+        }
+    }
+}
+
 struct SyncConfig: Codable, Equatable {
+    var mode: SyncMode
     var endpoint: String
     var userId: String
+    var supabaseUrl: String
+    var supabasePublishableKey: String
+    var email: String
 
     static var empty: SyncConfig {
-        SyncConfig(endpoint: "", userId: "personal")
+        SyncConfig(
+            mode: .supabase,
+            endpoint: "",
+            userId: "personal",
+            supabaseUrl: "",
+            supabasePublishableKey: "",
+            email: ""
+        )
+    }
+}
+
+struct SyncCredential: Codable, Equatable {
+    var accessToken: String
+    var refreshToken: String
+    var expiresAt: Date?
+    var localToken: String
+    var userEmail: String
+
+    static var empty: SyncCredential {
+        SyncCredential(
+            accessToken: "",
+            refreshToken: "",
+            expiresAt: nil,
+            localToken: "",
+            userEmail: ""
+        )
     }
 }
 

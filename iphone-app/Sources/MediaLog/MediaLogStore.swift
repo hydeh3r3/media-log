@@ -6,16 +6,16 @@ import Observation
 final class MediaLogStore {
     var snapshot: MediaLogSnapshot
     var syncConfig: SyncConfig
+    var syncCredential: SyncCredential
     var syncState: SyncState
-    var syncToken: String
     var syncStatus: String = ""
 
     private let fileURL: URL
-    private let tokenStore: KeychainTokenStoring
+    private let credentialStore: KeychainCredentialStoring
 
-    init(fileURL: URL = MediaLogStore.defaultFileURL(), tokenStore: KeychainTokenStoring = KeychainTokenStore()) {
+    init(fileURL: URL = MediaLogStore.defaultFileURL(), credentialStore: KeychainCredentialStoring = KeychainCredentialStore()) {
         self.fileURL = fileURL
-        self.tokenStore = tokenStore
+        self.credentialStore = credentialStore
 
         if
             let data = try? Data(contentsOf: fileURL),
@@ -30,7 +30,7 @@ final class MediaLogStore {
             syncConfig = empty.syncConfig
             syncState = empty.syncState
         }
-        syncToken = (try? tokenStore.readToken()) ?? ""
+        syncCredential = (try? credentialStore.readCredential()) ?? .empty
 
         ensureCurrentWeek()
     }
@@ -100,26 +100,48 @@ final class MediaLogStore {
         markDirty("week-archived")
     }
 
-    func saveSyncConfig(_ config: SyncConfig, token: String) {
+    func saveSyncConfig(_ config: SyncConfig, localToken: String? = nil) {
         syncConfig = config
-        syncToken = token
+        if let localToken {
+            syncCredential.localToken = localToken
+        }
+        saveCredential()
+        syncStatus = "Sync settings saved."
+        save()
+    }
+
+    func signInToSupabase(password: String) async {
         do {
-            try tokenStore.saveToken(token)
-            syncStatus = "Sync settings saved."
+            let session = try await SupabaseAuthClient(config: syncConfig).signIn(password: password)
+            syncCredential.accessToken = session.accessToken
+            syncCredential.refreshToken = session.refreshToken
+            syncCredential.expiresAt = session.expiresAt
+            syncCredential.userEmail = session.userEmail
+            saveCredential()
+            syncStatus = "Signed in\(session.userEmail.isEmpty ? "." : " as \(session.userEmail).")"
+            save()
         } catch {
             syncStatus = error.localizedDescription
         }
+    }
+
+    func signOutOfSupabase() async {
+        if !syncCredential.accessToken.isEmpty {
+            try? await SupabaseAuthClient(config: syncConfig).signOut(accessToken: syncCredential.accessToken)
+        }
+        syncCredential.accessToken = ""
+        syncCredential.refreshToken = ""
+        syncCredential.expiresAt = nil
+        syncCredential.userEmail = ""
+        saveCredential()
+        syncStatus = "Signed out."
         save()
     }
 
     func syncNow() async {
-        guard !syncConfig.endpoint.isEmpty, !syncToken.isEmpty else {
-            syncStatus = "Add a sync endpoint and token first."
-            return
-        }
-
         do {
-            let client = SyncClient(config: syncConfig, token: syncToken)
+            let token = try await syncTokenForRequest()
+            let client = SyncClient(config: syncConfig, token: token)
             let remote = try await client.fetchRecord()
             let merged = SyncMerge.merge(local: snapshot, remote: remote.data)
             let saved = try await client.push(snapshot: merged, clientId: syncState.clientId)
@@ -130,6 +152,47 @@ final class MediaLogStore {
             syncState.dirtyReason = nil
             syncStatus = "Synced revision \(saved.revision)."
             save()
+        } catch {
+            syncStatus = error.localizedDescription
+        }
+    }
+
+    private func syncTokenForRequest() async throws -> String {
+        switch syncConfig.mode {
+        case .local:
+            guard !syncConfig.endpoint.isEmpty, !syncCredential.localToken.isEmpty else {
+                throw SyncError.remote("Add a local endpoint and token first.")
+            }
+            return syncCredential.localToken
+        case .supabase:
+            guard !syncConfig.supabaseUrl.isEmpty, !syncConfig.supabasePublishableKey.isEmpty else {
+                throw SyncError.remote("Add Supabase URL and publishable key first.")
+            }
+            if
+                !syncCredential.accessToken.isEmpty,
+                let expiresAt = syncCredential.expiresAt,
+                expiresAt.timeIntervalSinceNow > 60
+            {
+                return syncCredential.accessToken
+            }
+
+            guard !syncCredential.refreshToken.isEmpty else {
+                throw SyncError.remote("Sign in to Supabase first.")
+            }
+
+            let session = try await SupabaseAuthClient(config: syncConfig).refresh(refreshToken: syncCredential.refreshToken)
+            syncCredential.accessToken = session.accessToken
+            syncCredential.refreshToken = session.refreshToken
+            syncCredential.expiresAt = session.expiresAt
+            syncCredential.userEmail = session.userEmail
+            saveCredential()
+            return session.accessToken
+        }
+    }
+
+    private func saveCredential() {
+        do {
+            try credentialStore.saveCredential(syncCredential)
         } catch {
             syncStatus = error.localizedDescription
         }

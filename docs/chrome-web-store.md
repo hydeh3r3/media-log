@@ -30,7 +30,7 @@ Media Log is a personal weekly media journal.
 
 Use it to save articles, manga, anime, films, TV shows, music, games, books, and podcasts. The extension can prefill the current tab title and URL, group entries by ISO week, keep a history, and sync with the companion iOS app when you connect a sync endpoint.
 
-Your data stays in browser storage unless you set up sync. Sync uses the endpoint and token you choose. The production sync path uses Supabase Auth, row-level security, and the `media-log-sync` Edge Function.
+Your data stays in browser storage unless you set up sync. Production sync uses Supabase Auth, row-level security, and the `media-log-sync` Edge Function. Local dev sync uses the endpoint and token you choose.
 
 ## Permission Notes
 

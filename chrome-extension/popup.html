@@ -122,16 +122,47 @@
   <section id="tab-sync" class="tab-content">
     <form id="sync-form">
       <label>
-        Sync endpoint
-        <input type="url" id="sync-endpoint" placeholder="https://project.supabase.co/functions/v1/media-log">
+        Sync mode
+        <select id="sync-mode">
+          <option value="supabase">Supabase</option>
+          <option value="local">Local dev</option>
+        </select>
       </label>
+      <div class="sync-local-fields">
+        <label>
+          Local endpoint
+          <input type="url" id="sync-endpoint" placeholder="http://127.0.0.1:43189">
+        </label>
+        <label>
+          Local token
+          <input type="password" id="sync-token" autocomplete="off">
+        </label>
+      </div>
+      <div class="sync-supabase-fields">
+        <label>
+          Supabase URL
+          <input type="url" id="sync-supabase-url" placeholder="https://project.supabase.co">
+        </label>
+        <label>
+          Publishable key
+          <input type="password" id="sync-supabase-key" autocomplete="off">
+        </label>
+        <label>
+          Email
+          <input type="email" id="sync-email" autocomplete="username">
+        </label>
+        <label>
+          Password
+          <input type="password" id="sync-password" autocomplete="current-password">
+        </label>
+        <div class="auth-actions">
+          <button type="button" id="btn-supabase-sign-in">Sign In</button>
+          <button type="button" id="btn-supabase-sign-out" class="secondary-action">Sign Out</button>
+        </div>
+      </div>
       <label>
         User ID
         <input type="text" id="sync-user-id" placeholder="personal">
-      </label>
-      <label>
-        Bearer token
-        <input type="password" id="sync-token" autocomplete="off">
       </label>
       <button type="submit">Save Sync Settings</button>
     </form>

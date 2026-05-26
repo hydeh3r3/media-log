@@ -74,7 +74,7 @@ The API path is:
 - `GET /v1/media-log?userId=...`
 - `PUT /v1/media-log`
 
-Clients send a bearer token. The local dev server uses a simple token. The Supabase version uses Supabase Auth and row-level security.
+Clients send a bearer token. The local dev server uses a simple token. The Supabase version signs in with email/password, refreshes the session before sync, and uses row-level security.
 
 The deployable Supabase files live in:
 

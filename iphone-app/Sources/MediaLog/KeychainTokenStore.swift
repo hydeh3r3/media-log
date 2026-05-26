@@ -1,16 +1,16 @@
 import Foundation
 import Security
 
-protocol KeychainTokenStoring {
-    func readToken() throws -> String
-    func saveToken(_ token: String) throws
+protocol KeychainCredentialStoring {
+    func readCredential() throws -> SyncCredential
+    func saveCredential(_ credential: SyncCredential) throws
 }
 
-struct KeychainTokenStore: KeychainTokenStoring {
+struct KeychainCredentialStore: KeychainCredentialStoring {
     private let service = "com.media-log.sync"
-    private let account = "bearer-token"
+    private let account = "sync-credential"
 
-    func readToken() throws -> String {
+    func readCredential() throws -> SyncCredential {
         var query = baseQuery()
         query[kSecReturnData as String] = true
         query[kSecMatchLimit as String] = kSecMatchLimitOne
@@ -19,27 +19,27 @@ struct KeychainTokenStore: KeychainTokenStoring {
         let status = SecItemCopyMatching(query as CFDictionary, &result)
 
         if status == errSecItemNotFound {
-            return ""
+            return .empty
         }
         guard status == errSecSuccess else {
             throw KeychainTokenError.unexpectedStatus(status)
         }
         guard
-            let data = result as? Data,
-            let token = String(data: data, encoding: .utf8)
+            let data = result as? Data
         else {
-            return ""
+            return .empty
         }
-        return token
+
+        return (try? JSONDecoder().decode(SyncCredential.self, from: data)) ?? .empty
     }
 
-    func saveToken(_ token: String) throws {
-        if token.isEmpty {
+    func saveCredential(_ credential: SyncCredential) throws {
+        if credential == .empty {
             try deleteToken()
             return
         }
 
-        let data = Data(token.utf8)
+        let data = try JSONEncoder.pretty.encode(credential)
         var query = baseQuery()
         let attributes: [String: Any] = [
             kSecValueData as String: data

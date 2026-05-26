@@ -105,7 +105,8 @@ The iOS folder now contains an Xcode project with a SwiftUI app. It has:
 - local persistence
 - sync settings
 - cloud sync with the same data model as Chrome
-- Keychain storage for the sync bearer token
+- Supabase email/password sign-in
+- Keychain storage for the iOS sync session
 - app icon assets
 
 It still needs a developer team set in Xcode before device install, TestFlight, or App Store submission.

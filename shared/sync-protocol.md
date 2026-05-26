@@ -70,6 +70,8 @@ Clients send:
 
 The local dev server uses a simple token. Production uses Supabase Auth and row-level security.
 
+Production clients sign in with Supabase email/password auth, then use the returned access token for sync requests. Refresh tokens are used to renew the session before sync.
+
 ## Offline Merge
 
 Clients merge before they upload:

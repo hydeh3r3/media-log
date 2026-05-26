@@ -18,6 +18,8 @@ The app should not collect analytics, ads, or tracking data.
 
 Secrets and local exports must not be committed. Keep `.env`, local sync files, database files, and browser storage exports ignored.
 
-Production sync should use a Supabase user access token in the clients. The Supabase service key belongs only in Supabase function secrets.
+Production sync signs in through Supabase Auth. The clients store a Supabase session, not the account password.
 
-The iOS app stores the sync bearer token in Keychain. The local media log JSON file should not contain that token.
+The iOS app stores the session in Keychain. The local media log JSON file should not contain sync credentials.
+
+The Chrome extension stores the session in extension storage. The Supabase service key belongs only in Supabase function secrets.

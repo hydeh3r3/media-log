@@ -27,6 +27,7 @@ Run:
 
 Use these settings in the Sync tab:
 
+- Mode: `Local dev`
 - Endpoint: `http://127.0.0.1:43189`
 - User ID: `personal`
 - Token: `dev-media-log-token`
@@ -39,11 +40,17 @@ Deploy the Supabase backend in `supabase/`.
 
 Setup steps are in `docs/supabase-sync.md`.
 
-Use this endpoint in the Sync tab:
+Use these settings in the Sync tab:
 
-`https://<project-ref>.supabase.co/functions/v1/media-log-sync`
+- Mode: `Supabase`
+- Supabase URL: `https://<project-ref>.supabase.co`
+- Publishable key: your Supabase publishable key
+- Email: your Supabase account email
+- Password: your Supabase account password
 
-Use a Supabase user access token. Do not use a service key in the extension.
+Click `Sign In`, then click `Sync Now`.
+
+Do not use a service key in the extension. The password is used only for sign-in and is not saved.
 
 ## Migration
 

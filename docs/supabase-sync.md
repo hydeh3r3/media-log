@@ -26,9 +26,11 @@ The row is owned by the Supabase Auth user ID.
 
 Use Supabase Auth to create your personal account.
 
-The sync token in Chrome and iOS should be a Supabase user access token. Do not use the service key in either client.
+Chrome and iOS sign in with your Supabase email and password. Supabase returns an access token and a refresh token.
 
-The iOS app stores this token in Keychain.
+The iOS app stores the session in Keychain. The Chrome extension stores the session in extension storage.
+
+Passwords are not saved.
 
 The Edge Function checks the user token before it reads or writes data.
 
@@ -60,13 +62,17 @@ The function supports both forms. Do not commit any secret value.
 
 Use these settings in Chrome and iOS:
 
-- Endpoint: `https://<project-ref>.supabase.co/functions/v1/media-log-sync`
+- Mode: `Supabase`
+- Supabase URL: `https://<project-ref>.supabase.co`
+- Publishable key: your Supabase publishable key
+- Email: your Supabase account email
 - User ID: `personal`
-- Token: your Supabase user access token
+
+Then sign in and sync.
 
 The Supabase function ignores the typed User ID for production data ownership. It uses the Auth user ID from the token.
 
-The local Bun server still uses the User ID field for local testing.
+The local Bun server still uses the User ID and local token fields for local testing.
 
 ## Migration
 
@@ -82,4 +88,5 @@ After that, click `Sync Now` to upload the merged snapshot.
 - Users can only read or write their own row.
 - The Edge Function validates the bearer token.
 - Server secrets stay in Supabase, not in the extension or iOS app.
+- Service keys must never be pasted into either client.
 - Sync uses JSON over HTTPS.

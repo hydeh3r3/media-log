@@ -60,7 +60,8 @@ struct SyncClient {
     }
 
     private func endpointURL() -> URL {
-        guard var url = URL(string: config.endpoint) else {
+        let endpoint = config.mode == .supabase ? config.supabaseFunctionEndpoint : config.endpoint
+        guard var url = URL(string: endpoint) else {
             return URL(string: "http://127.0.0.1:43189/v1/media-log")!
         }
 
@@ -96,5 +97,12 @@ enum SyncError: LocalizedError {
         case .remote(let message):
             message
         }
+    }
+}
+
+extension SyncConfig {
+    var supabaseFunctionEndpoint: String {
+        guard let url = URL(string: supabaseUrl) else { return endpoint }
+        return "\(url.scheme ?? "https")://\(url.host ?? "")/functions/v1/media-log-sync"
     }
 }

@@ -18,6 +18,7 @@
 		A00000000000000000000021 /* SyncSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000020 /* SyncSettingsView.swift */; };
 		A00000000000000000000023 /* WeekMath.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000022 /* WeekMath.swift */; };
 		A00000000000000000000025 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000024 /* Assets.xcassets */; };
+		A00000000000000000000028 /* SupabaseAuthClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000027 /* SupabaseAuthClient.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -34,6 +35,7 @@
 		A00000000000000000000022 /* WeekMath.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeekMath.swift; sourceTree = "<group>"; };
 		A00000000000000000000024 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		A00000000000000000000026 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		A00000000000000000000027 /* SupabaseAuthClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SupabaseAuthClient.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -77,6 +79,7 @@
 				A0000000000000000000001C /* SyncClient.swift */,
 				A0000000000000000000001E /* SyncMerge.swift */,
 				A00000000000000000000020 /* SyncSettingsView.swift */,
+				A00000000000000000000027 /* SupabaseAuthClient.swift */,
 				A00000000000000000000022 /* WeekMath.swift */,
 			);
 			path = Sources/MediaLog;
@@ -160,6 +163,7 @@
 				A0000000000000000000001D /* SyncClient.swift in Sources */,
 				A0000000000000000000001F /* SyncMerge.swift in Sources */,
 				A00000000000000000000021 /* SyncSettingsView.swift in Sources */,
+				A00000000000000000000028 /* SupabaseAuthClient.swift in Sources */,
 				A00000000000000000000023 /* WeekMath.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

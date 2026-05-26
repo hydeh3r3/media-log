@@ -12,7 +12,13 @@ const ENTRY_TYPES = {
 };
 const SELECTABLE_ENTRY_TYPES = new Set(["anime", "article", "book", "film", "game", "manga", "music", "podcast", "tv"]);
 const DEFAULT_ENTRY_TYPE = "article";
-const STORAGE_KEYS = ["currentWeek", "history", "addDraft", "syncConfig", "syncState", "syncTombstones"];
+const STORAGE_KEYS = ["currentWeek", "history", "addDraft", "syncConfig", "syncSession", "syncState", "syncTombstones"];
+const SYNC_MODES = {
+  SUPABASE: "supabase",
+  LOCAL: "local",
+};
+const SUPABASE_SYNC_PATH = "/functions/v1/media-log-sync";
+const TOKEN_REFRESH_MARGIN_MS = 60_000;
 
 const MONTHS = [
   "January",
@@ -679,6 +685,21 @@ function normalizeEndpoint(endpoint) {
   return url.toString();
 }
 
+function normalizeSupabaseUrl(value) {
+  const url = new URL(value);
+  if (url.protocol !== "https:") {
+    throw new Error("Supabase URL must use HTTPS.");
+  }
+  url.pathname = "";
+  url.search = "";
+  url.hash = "";
+  return url.toString().replace(/\/$/, "");
+}
+
+function supabaseFunctionEndpoint(supabaseUrl) {
+  return `${normalizeSupabaseUrl(supabaseUrl)}${SUPABASE_SYNC_PATH}`;
+}
+
 function syncResourceUrl(endpoint, userId) {
   const url = new URL(normalizeEndpoint(endpoint));
   url.searchParams.set("userId", userId || "personal");
@@ -698,6 +719,102 @@ async function requestSyncHostPermission(endpoint) {
   }
 
   return chrome.permissions.request({ origins: [originPattern] });
+}
+
+async function authRequest(config, grantType, body) {
+  const supabaseUrl = normalizeSupabaseUrl(config.supabaseUrl);
+  const response = await fetch(`${supabaseUrl}/auth/v1/token?grant_type=${grantType}`, {
+    method: "POST",
+    headers: {
+      apikey: config.supabaseAnonKey,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(body),
+  });
+  const result = await response.json();
+
+  if (!response.ok) {
+    throw new Error(result.error_description || result.msg || result.error || `Auth failed with ${response.status}`);
+  }
+
+  return {
+    accessToken: result.access_token,
+    refreshToken: result.refresh_token,
+    expiresAt: Date.now() + Math.max((result.expires_in || 3600) - 30, 1) * 1000,
+    userEmail: result.user?.email || config.email || "",
+  };
+}
+
+async function signInWithSupabase(config, password) {
+  if (!config.supabaseUrl || !config.supabaseAnonKey || !config.email || !password) {
+    throw new Error("Supabase URL, key, email, and password are required.");
+  }
+
+  const allowed = await requestSyncHostPermission(config.supabaseUrl);
+  if (!allowed) {
+    throw new Error("Supabase host permission was not granted.");
+  }
+
+  const session = await authRequest(config, "password", {
+    email: config.email,
+    password,
+  });
+  await setStorage({ syncSession: session });
+  return session;
+}
+
+async function refreshSupabaseSession(config, session) {
+  if (!session?.refreshToken) {
+    throw new Error("Sign in to Supabase first.");
+  }
+
+  const refreshed = await authRequest(config, "refresh_token", {
+    refresh_token: session.refreshToken,
+  });
+  await setStorage({ syncSession: refreshed });
+  return refreshed;
+}
+
+async function signOutOfSupabase(config, session) {
+  if (session?.accessToken && config.supabaseUrl && config.supabaseAnonKey) {
+    const supabaseUrl = normalizeSupabaseUrl(config.supabaseUrl);
+    await fetch(`${supabaseUrl}/auth/v1/logout`, {
+      method: "POST",
+      headers: {
+        apikey: config.supabaseAnonKey,
+        Authorization: `Bearer ${session.accessToken}`,
+      },
+    }).catch(() => {});
+  }
+  await setStorage({ syncSession: null });
+}
+
+async function getSyncAuth(config, storedSession) {
+  const mode = config.mode || SYNC_MODES.SUPABASE;
+  if (mode === SYNC_MODES.LOCAL) {
+    if (!config.endpoint || !config.token) {
+      throw new Error("Local endpoint and token are required.");
+    }
+    return {
+      endpoint: normalizeEndpoint(config.endpoint),
+      token: config.token,
+      userId: config.userId || "personal",
+    };
+  }
+
+  if (!config.supabaseUrl || !config.supabaseAnonKey) {
+    throw new Error("Supabase URL and publishable key are required.");
+  }
+
+  const session = storedSession?.accessToken && storedSession.expiresAt > Date.now() + TOKEN_REFRESH_MARGIN_MS
+    ? storedSession
+    : await refreshSupabaseSession(config, storedSession);
+
+  return {
+    endpoint: supabaseFunctionEndpoint(config.supabaseUrl),
+    token: session.accessToken,
+    userId: config.userId || "personal",
+  };
 }
 
 async function fetchSyncRecord(config) {
@@ -738,10 +855,16 @@ async function pushSyncRecord(config, clientId, snapshot) {
 }
 
 function getSyncConfigFromForm() {
+  const mode = document.getElementById("sync-mode").value;
+  const supabaseUrl = document.getElementById("sync-supabase-url").value.trim();
   return {
+    mode,
     endpoint: document.getElementById("sync-endpoint").value.trim(),
     userId: document.getElementById("sync-user-id").value.trim() || "personal",
     token: document.getElementById("sync-token").value,
+    supabaseUrl,
+    supabaseAnonKey: document.getElementById("sync-supabase-key").value.trim(),
+    email: document.getElementById("sync-email").value.trim(),
   };
 }
 
@@ -756,6 +879,14 @@ function renderSyncSummary(data) {
   const historyWeeks = data.history?.length || 0;
   const historyEntries = (data.history || []).reduce((sum, week) => sum + (week.entries?.length || 0), 0);
   const migrationStats = getSnapshotStats(cloneSnapshot(data));
+  const config = data.syncConfig || {};
+  const session = data.syncSession || {};
+  const modeText = (config.mode || SYNC_MODES.SUPABASE) === SYNC_MODES.LOCAL ? "Local dev" : "Supabase";
+  const authText = config.mode === SYNC_MODES.LOCAL
+    ? "Local token saved"
+    : session.accessToken
+      ? `Signed in${session.userEmail ? ` as ${session.userEmail}` : ""}`
+      : "Not signed in";
   const lastSyncedAt = data.syncState?.lastSyncedAt ? new Date(data.syncState.lastSyncedAt).toLocaleString() : "Never";
   const dirtyText = data.syncState?.dirtyAt ? "Local changes waiting to sync" : "No local changes waiting";
   const migrationText = migrationStats.entriesNeedingMetadata > 0
@@ -763,7 +894,7 @@ function renderSyncSummary(data) {
     : "Local data is ready for sync";
 
   document.getElementById("sync-summary").textContent =
-    `Current entries: ${currentEntries}\nArchived weeks: ${historyWeeks}\nArchived entries: ${historyEntries}\nLast sync: ${lastSyncedAt}\n${dirtyText}\n${migrationText}`;
+    `Mode: ${modeText}\nAuth: ${authText}\nCurrent entries: ${currentEntries}\nArchived weeks: ${historyWeeks}\nArchived entries: ${historyEntries}\nLast sync: ${lastSyncedAt}\n${dirtyText}\n${migrationText}`;
 }
 
 function getSnapshotStats(snapshot) {
@@ -833,31 +964,62 @@ async function prepareLocalDataForSync() {
 async function restoreSyncSettings() {
   const data = await getStorage();
   const config = data.syncConfig || {};
+  const mode = config.mode || SYNC_MODES.SUPABASE;
+  document.getElementById("sync-mode").value = mode;
   document.getElementById("sync-endpoint").value = config.endpoint || "";
   document.getElementById("sync-user-id").value = config.userId || "personal";
   document.getElementById("sync-token").value = config.token || "";
+  document.getElementById("sync-supabase-url").value = config.supabaseUrl || "";
+  document.getElementById("sync-supabase-key").value = config.supabaseAnonKey || "";
+  document.getElementById("sync-email").value = config.email || data.syncSession?.userEmail || "";
+  document.getElementById("sync-password").value = "";
+  updateSyncModeFields(mode);
   renderSyncSummary(data);
+}
+
+function updateSyncModeFields(mode) {
+  const localFields = document.querySelector(".sync-local-fields");
+  const supabaseFields = document.querySelector(".sync-supabase-fields");
+  const isLocal = mode === SYNC_MODES.LOCAL;
+  localFields.hidden = !isLocal;
+  supabaseFields.hidden = isLocal;
+}
+
+function configForSave(config) {
+  if (config.mode === SYNC_MODES.LOCAL) {
+    return {
+      mode: SYNC_MODES.LOCAL,
+      endpoint: normalizeEndpoint(config.endpoint),
+      userId: config.userId || "personal",
+      token: config.token,
+    };
+  }
+
+  return {
+    mode: SYNC_MODES.SUPABASE,
+    endpoint: supabaseFunctionEndpoint(config.supabaseUrl),
+    userId: config.userId || "personal",
+    supabaseUrl: normalizeSupabaseUrl(config.supabaseUrl),
+    supabaseAnonKey: config.supabaseAnonKey,
+    email: config.email,
+  };
 }
 
 async function syncNow() {
   const data = await ensureCurrentWeek();
   const config = data.syncConfig || getSyncConfigFromForm();
+  const auth = await getSyncAuth(config, data.syncSession || null);
 
-  if (!config.endpoint || !config.token) {
-    throw new Error("Add a sync endpoint and token first.");
-  }
-
-  const endpoint = normalizeEndpoint(config.endpoint);
-  const allowed = await requestSyncHostPermission(endpoint);
+  const allowed = await requestSyncHostPermission(auth.endpoint);
   if (!allowed) {
     throw new Error("Sync host permission was not granted.");
   }
 
   const clientId = await getClientId(data.syncState || {});
   const localSnapshot = getSnapshotFromStorage(data);
-  const remoteRecord = await fetchSyncRecord({ ...config, endpoint });
+  const remoteRecord = await fetchSyncRecord(auth);
   const mergedSnapshot = mergeSnapshots(localSnapshot, remoteRecord.data);
-  const savedRecord = await pushSyncRecord({ ...config, endpoint }, clientId, mergedSnapshot);
+  const savedRecord = await pushSyncRecord(auth, clientId, mergedSnapshot);
   const returnedSnapshot = savedRecord.data || mergedSnapshot;
   const now = new Date().toISOString();
 
@@ -1271,13 +1433,9 @@ document.getElementById("sync-form").addEventListener("submit", async (event) =>
   event.preventDefault();
 
   try {
-    const config = getSyncConfigFromForm();
-    if (!config.endpoint || !config.token) {
-      throw new Error("Endpoint and token are required.");
-    }
-
-    config.endpoint = normalizeEndpoint(config.endpoint);
-    const allowed = await requestSyncHostPermission(config.endpoint);
+    const config = configForSave(getSyncConfigFromForm());
+    const permissionTarget = config.mode === SYNC_MODES.LOCAL ? config.endpoint : config.supabaseUrl;
+    const allowed = await requestSyncHostPermission(permissionTarget);
     if (!allowed) {
       throw new Error("Sync host permission was not granted.");
     }
@@ -1285,6 +1443,41 @@ document.getElementById("sync-form").addEventListener("submit", async (event) =>
     await setStorage({ syncConfig: config });
     await restoreSyncSettings();
     showSyncStatus("Sync settings saved.");
+  } catch (error) {
+    showSyncStatus(getErrorMessage(error), true);
+  }
+});
+
+document.getElementById("sync-mode").addEventListener("change", (event) => {
+  updateSyncModeFields(event.target.value);
+});
+
+document.getElementById("btn-supabase-sign-in").addEventListener("click", async () => {
+  try {
+    const config = configForSave(getSyncConfigFromForm());
+    if (config.mode !== SYNC_MODES.SUPABASE) {
+      throw new Error("Switch sync mode to Supabase first.");
+    }
+
+    showSyncStatus("Signing in...");
+    const password = document.getElementById("sync-password").value;
+    const session = await signInWithSupabase(config, password);
+    await setStorage({ syncConfig: config });
+    document.getElementById("sync-password").value = "";
+    await restoreSyncSettings();
+    showSyncStatus(`Signed in${session.userEmail ? ` as ${session.userEmail}` : ""}.`);
+  } catch (error) {
+    showSyncStatus(getErrorMessage(error), true);
+  }
+});
+
+document.getElementById("btn-supabase-sign-out").addEventListener("click", async () => {
+  try {
+    const data = await getStorage();
+    const config = data.syncConfig || configForSave(getSyncConfigFromForm());
+    await signOutOfSupabase(config, data.syncSession || null);
+    await restoreSyncSettings();
+    showSyncStatus("Signed out.");
   } catch (error) {
     showSyncStatus(getErrorMessage(error), true);
   }
