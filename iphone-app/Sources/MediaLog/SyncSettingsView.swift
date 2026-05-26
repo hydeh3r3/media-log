@@ -17,9 +17,9 @@ struct SyncSettingsView: View {
                 SecureField("Token", text: $token)
                 Button("Save Settings") {
                     store.saveSyncConfig(
-                        SyncConfig(endpoint: endpoint, userId: userId.isEmpty ? "personal" : userId, token: token)
+                        SyncConfig(endpoint: endpoint, userId: userId.isEmpty ? "personal" : userId),
+                        token: token
                     )
-                    store.syncStatus = "Sync settings saved."
                 }
             }
 
@@ -45,7 +45,7 @@ struct SyncSettingsView: View {
         .onAppear {
             endpoint = store.syncConfig.endpoint
             userId = store.syncConfig.userId
-            token = store.syncConfig.token
+            token = store.syncToken
         }
     }
 }

@@ -65,7 +65,7 @@ Cons:
 
 ## Choice
 
-Use a small HTTPS JSON sync API first, with Supabase as the recommended production host.
+Use a small HTTPS JSON sync API first, with Supabase as the production host.
 
 This keeps the Chrome extension and iOS app simple. It also lets us run a local Bun sync server while credentials are missing.
 
@@ -74,7 +74,14 @@ The API path is:
 - `GET /v1/media-log?userId=...`
 - `PUT /v1/media-log`
 
-Clients send a bearer token. The local dev server uses a simple token. A production Supabase version should use Supabase Auth and row-level security.
+Clients send a bearer token. The local dev server uses a simple token. The Supabase version uses Supabase Auth and row-level security.
+
+The deployable Supabase files live in:
+
+- `supabase/migrations/20260526173000_create_media_log_records.sql`
+- `supabase/functions/media-log-sync/index.ts`
+
+Setup steps are in `docs/supabase-sync.md`.
 
 ## Conflict Rule
 
@@ -89,4 +96,4 @@ Rules:
 - A tombstone wins when its delete time is newer than the entry edit time.
 - Drafts use newest `updatedAt`.
 
-This is enough for personal offline use across Chrome and iOS. A production Supabase function should use the same rules on the server too.
+This is enough for personal offline use across Chrome and iOS. The Supabase function also merges incoming data with the stored row before it writes.

@@ -755,11 +755,79 @@ function renderSyncSummary(data) {
   const currentEntries = data.currentWeek?.entries?.length || 0;
   const historyWeeks = data.history?.length || 0;
   const historyEntries = (data.history || []).reduce((sum, week) => sum + (week.entries?.length || 0), 0);
+  const migrationStats = getSnapshotStats(cloneSnapshot(data));
   const lastSyncedAt = data.syncState?.lastSyncedAt ? new Date(data.syncState.lastSyncedAt).toLocaleString() : "Never";
   const dirtyText = data.syncState?.dirtyAt ? "Local changes waiting to sync" : "No local changes waiting";
+  const migrationText = migrationStats.entriesNeedingMetadata > 0
+    ? `${migrationStats.entriesNeedingMetadata} entries need local prep`
+    : "Local data is ready for sync";
 
   document.getElementById("sync-summary").textContent =
-    `Current entries: ${currentEntries}\nArchived weeks: ${historyWeeks}\nArchived entries: ${historyEntries}\nLast sync: ${lastSyncedAt}\n${dirtyText}`;
+    `Current entries: ${currentEntries}\nArchived weeks: ${historyWeeks}\nArchived entries: ${historyEntries}\nLast sync: ${lastSyncedAt}\n${dirtyText}\n${migrationText}`;
+}
+
+function getSnapshotStats(snapshot) {
+  const stats = {
+    currentEntries: snapshot.currentWeek?.entries?.length || 0,
+    historyWeeks: snapshot.history?.length || 0,
+    historyEntries: 0,
+    totalEntries: 0,
+    entriesNeedingMetadata: 0,
+    tombstones: Object.keys(snapshot.tombstones || {}).length,
+    draftPresent: Boolean(snapshot.addDraft?.title || snapshot.addDraft?.url || snapshot.addDraft?.note),
+  };
+
+  const addEntries = (entries = []) => {
+    for (const entry of entries) {
+      stats.totalEntries += 1;
+      if (!entry.id || !entry.createdAt || !entry.updatedAt) {
+        stats.entriesNeedingMetadata += 1;
+      }
+    }
+  };
+
+  addEntries(snapshot.currentWeek?.entries);
+  for (const week of snapshot.history || []) {
+    stats.historyEntries += week.entries?.length || 0;
+    addEntries(week.entries);
+  }
+
+  return stats;
+}
+
+function formatMigrationReport(report) {
+  const preparedCount = report.before.entriesNeedingMetadata;
+  const preparedText = preparedCount === 1
+    ? "Added missing metadata to 1 entry."
+    : `Added missing metadata to ${preparedCount} entries.`;
+  const draftText = report.after.draftPresent ? "Draft saved." : "No draft saved.";
+
+  return `Prepared local data. Entries: ${report.after.totalEntries}. Archived weeks: ${report.after.historyWeeks}. Tombstones: ${report.after.tombstones}. ${preparedText} ${draftText}`;
+}
+
+async function prepareLocalDataForSync() {
+  const beforeData = await getStorage();
+  const before = getSnapshotStats(cloneSnapshot(beforeData));
+  const currentData = await ensureCurrentWeek();
+  const snapshot = getSnapshotFromStorage(currentData);
+  const now = new Date().toISOString();
+  const syncStatePatch = {
+    ...(currentData.syncState || {}),
+    clientId: await getClientId(currentData.syncState || {}),
+  };
+
+  if (before.entriesNeedingMetadata > 0) {
+    syncStatePatch.dirtyAt = now;
+    syncStatePatch.dirtyReason = "migration";
+  }
+
+  await saveSnapshot(snapshot, syncStatePatch);
+
+  const afterData = await getStorage();
+  return {
+    before,
+    after: getSnapshotStats(cloneSnapshot(afterData)),
+  };
 }
 
 async function restoreSyncSettings() {
@@ -1229,6 +1297,17 @@ document.getElementById("btn-sync-now").addEventListener("click", async () => {
     const data = await getStorage();
     renderSyncSummary(data);
     showSyncStatus(`Synced revision ${record.revision}.`);
+  } catch (error) {
+    showSyncStatus(getErrorMessage(error), true);
+  }
+});
+
+document.getElementById("btn-prepare-migration").addEventListener("click", async () => {
+  try {
+    const report = await prepareLocalDataForSync();
+    const data = await getStorage();
+    renderSyncSummary(data);
+    showSyncStatus(formatMigrationReport(report));
   } catch (error) {
     showSyncStatus(getErrorMessage(error), true);
   }

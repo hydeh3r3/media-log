@@ -16,6 +16,8 @@ node_modules/
 .venv/
 .swiftpm/
 .build/
+supabase/.branches/
+supabase/.temp/
 __pycache__/
 .pytest_cache/
 dist/

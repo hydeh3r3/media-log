@@ -10,6 +10,8 @@ It can:
 - save data on device
 - sync with the same JSON endpoint as the Chrome extension
 
+The app stores media log data in its local JSON file. The sync bearer token is stored in Keychain.
+
 ## Build Check
 
 Run:
@@ -31,3 +33,17 @@ Then use these settings in the app:
 - Token: `dev-media-log-token`
 
 The local sync file is ignored.
+
+## Production Sync
+
+Deploy the Supabase backend from the repo root:
+
+`bun run supabase:deploy`
+
+Setup steps are in `docs/supabase-sync.md`.
+
+Use this endpoint in the app:
+
+`https://<project-ref>.supabase.co/functions/v1/media-log-sync`
+
+Use a Supabase user access token. Do not paste a service key into the app.

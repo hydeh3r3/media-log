@@ -33,6 +33,26 @@ Use these settings in the Sync tab:
 
 The dev server writes to `.local-sync/`, which is ignored.
 
+## Production Sync
+
+Deploy the Supabase backend in `supabase/`.
+
+Setup steps are in `docs/supabase-sync.md`.
+
+Use this endpoint in the Sync tab:
+
+`https://<project-ref>.supabase.co/functions/v1/media-log-sync`
+
+Use a Supabase user access token. Do not use a service key in the extension.
+
+## Migration
+
+Open the Sync tab and click `Prepare Local Data`.
+
+This adds missing IDs and timestamps to older browser entries. It only reports counts, not titles, URLs, or notes.
+
+Then click `Sync Now`.
+
 ## Release Package
 
 Run:

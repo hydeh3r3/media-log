@@ -15,6 +15,7 @@ struct SyncEnvelope: Codable {
 
 struct SyncClient {
     let config: SyncConfig
+    let token: String
 
     func fetchRecord() async throws -> SyncRecord {
         var components = URLComponents(url: endpointURL(), resolvingAgainstBaseURL: false)
@@ -25,7 +26,7 @@ struct SyncClient {
         }
 
         var request = URLRequest(url: url)
-        request.setValue("Bearer \(config.token)", forHTTPHeaderField: "Authorization")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
 
         let (data, response) = try await URLSession.shared.data(for: request)
         try validate(response: response, data: data)
@@ -41,7 +42,7 @@ struct SyncClient {
     func push(snapshot: MediaLogSnapshot, clientId: String) async throws -> SyncRecord {
         var request = URLRequest(url: endpointURL())
         request.httpMethod = "PUT"
-        request.setValue("Bearer \(config.token)", forHTTPHeaderField: "Authorization")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.httpBody = try JSONEncoder.pretty.encode(
             PushBody(userId: config.userId, clientId: clientId, data: snapshot)

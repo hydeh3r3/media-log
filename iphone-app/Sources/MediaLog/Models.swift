@@ -102,10 +102,9 @@ struct MediaLogSnapshot: Codable, Equatable {
 struct SyncConfig: Codable, Equatable {
     var endpoint: String
     var userId: String
-    var token: String
 
     static var empty: SyncConfig {
-        SyncConfig(endpoint: "", userId: "personal", token: "")
+        SyncConfig(endpoint: "", userId: "personal")
     }
 }
 

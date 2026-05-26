@@ -7,12 +7,15 @@ final class MediaLogStore {
     var snapshot: MediaLogSnapshot
     var syncConfig: SyncConfig
     var syncState: SyncState
+    var syncToken: String
     var syncStatus: String = ""
 
     private let fileURL: URL
+    private let tokenStore: KeychainTokenStoring
 
-    init(fileURL: URL = MediaLogStore.defaultFileURL()) {
+    init(fileURL: URL = MediaLogStore.defaultFileURL(), tokenStore: KeychainTokenStoring = KeychainTokenStore()) {
         self.fileURL = fileURL
+        self.tokenStore = tokenStore
 
         if
             let data = try? Data(contentsOf: fileURL),
@@ -27,6 +30,7 @@ final class MediaLogStore {
             syncConfig = empty.syncConfig
             syncState = empty.syncState
         }
+        syncToken = (try? tokenStore.readToken()) ?? ""
 
         ensureCurrentWeek()
     }
@@ -96,14 +100,26 @@ final class MediaLogStore {
         markDirty("week-archived")
     }
 
-    func saveSyncConfig(_ config: SyncConfig) {
+    func saveSyncConfig(_ config: SyncConfig, token: String) {
         syncConfig = config
+        syncToken = token
+        do {
+            try tokenStore.saveToken(token)
+            syncStatus = "Sync settings saved."
+        } catch {
+            syncStatus = error.localizedDescription
+        }
         save()
     }
 
     func syncNow() async {
+        guard !syncConfig.endpoint.isEmpty, !syncToken.isEmpty else {
+            syncStatus = "Add a sync endpoint and token first."
+            return
+        }
+
         do {
-            let client = SyncClient(config: syncConfig)
+            let client = SyncClient(config: syncConfig, token: syncToken)
             let remote = try await client.fetchRecord()
             let merged = SyncMerge.merge(local: snapshot, remote: remote.data)
             let saved = try await client.push(snapshot: merged, clientId: syncState.clientId)

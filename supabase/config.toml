@@ -1,0 +1,4 @@
+project_id = "media-log"
+
+[functions.media-log-sync]
+verify_jwt = true

@@ -95,7 +95,7 @@ textarea {
   resize: vertical;
 }
 
-button[type="submit"], .week-actions button, .history-summary-actions button, .sync-actions button {
+button[type="submit"], .week-actions button, .history-summary-actions button, .sync-actions button, .migration-actions button {
   width: 100%;
   padding: 10px;
   margin-top: 4px;
@@ -109,7 +109,7 @@ button[type="submit"], .week-actions button, .history-summary-actions button, .s
   transition: background 0.15s;
 }
 
-button[type="submit"]:hover, .week-actions button:hover, .history-summary-actions button:hover, .sync-actions button:hover {
+button[type="submit"]:hover, .week-actions button:hover, .history-summary-actions button:hover, .sync-actions button:hover, .migration-actions button:hover {
   background: #C96442;
 }
 
@@ -124,13 +124,13 @@ button[type="submit"]:hover, .week-actions button:hover, .history-summary-action
   grid-column: 1 / -1;
 }
 
-.secondary-action {
+button.secondary-action {
   background: transparent;
   color: #8B8478;
   border: 1px solid #D4CBC0;
 }
 
-.secondary-action:hover {
+button.secondary-action:hover {
   background: #EDE5DA;
   color: #5A544C;
 }
@@ -366,6 +366,10 @@ button[type="submit"]:hover, .week-actions button:hover, .history-summary-action
 
 .sync-actions {
   margin-top: 12px;
+}
+
+.migration-actions {
+  margin-top: 8px;
 }
 
 .sync-summary {

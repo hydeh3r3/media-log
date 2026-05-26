@@ -2,14 +2,15 @@
 
 Date: 2026-05-26
 
-## Current Shape
+## Repo Shape
 
 The repo has four main areas:
 
 - `chrome-extension`: the Chrome Manifest V3 popup.
 - `firefox-extension`: the Firefox and Zen copy of the popup.
-- `shared`: notes for shared data logic.
-- `iphone-app`: a placeholder for the future iOS app.
+- `shared`: sync protocol notes.
+- `iphone-app`: the SwiftUI companion app package.
+- `supabase`: the production sync database and Edge Function.
 
 The Chrome extension is the main product target. The Firefox folder is useful for Zen, but it is not the official store target for this goal.
 
@@ -22,6 +23,7 @@ It has these tabs:
 - Add
 - This Week
 - History
+- Sync
 
 It stores all user data in `chrome.storage.local`.
 
@@ -30,12 +32,15 @@ Current storage keys:
 - `currentWeek`
 - `history`
 - `addDraft`
+- `syncConfig`
+- `syncState`
+- `syncTombstones`
 
 The popup can prefill the URL and title from the active tab. It also guesses the media type from the page URL and title.
 
 ## Data Model
 
-The current week shape is:
+The week shape is:
 
 - `weekStart`
 - `weekEnd`
@@ -49,11 +54,13 @@ Each entry has:
 - `title`
 - `date`
 - `createdAt`
+- `updatedAt`
+- `id`
 - `url`, optional
 - `rating`, optional
 - `note`, optional
 
-For cloud sync, entries also need stable IDs and edit timestamps.
+Old local entries are prepared for sync by adding stable IDs and edit timestamps. The migration UI reports counts only.
 
 ## Current Permissions
 
@@ -64,17 +71,17 @@ The old Chrome manifest used:
 - `clipboardWrite`
 - local bridge host permissions
 
-Publishing to the Chrome Web Store needs tighter permissions. The release target should use:
+The release manifest now uses:
 
 - `storage`
 - `activeTab`
-- optional host permission only for the chosen sync endpoint
+- optional host permission only for Supabase or a local sync endpoint
 
 The extension does not use clipboard access today, so `clipboardWrite` should not ship.
 
 ## Publishing Gaps
 
-The extension is not ready for the Chrome Web Store yet because it needs:
+The extension now has:
 
 - tighter permissions
 - a privacy note
@@ -82,17 +89,31 @@ The extension is not ready for the Chrome Web Store yet because it needs:
 - screenshot guidance
 - a repeatable release package command
 - no local website bridge code in the release package
-- a cloud sync path that also works for iOS
+- a sync path that also works for iOS
 
-## iOS Gap
+Manual store work still remains:
 
-The iOS folder is only a README. It needs a SwiftUI app with:
+- create final screenshots
+- answer the Chrome Web Store privacy form
+- upload the release zip
+
+## iOS App
+
+The iOS folder now contains a Swift Package with a SwiftUI app. It has:
 
 - list, add, edit, and delete entry views
 - local persistence
 - sync settings
 - cloud sync with the same data model as Chrome
+- Keychain storage for the sync bearer token
 
-## Sync Gap
+It still needs a signed Xcode project wrapper before device install, TestFlight, or App Store submission.
 
-There is no backend today. The best next step is a small HTTPS JSON sync API. Chrome and iOS can both use it. A local Bun server can be used for safe development before real credentials exist.
+## Sync Path
+
+The repo now has two sync paths:
+
+- Local dev: `scripts/sync-dev-server.js`
+- Production: `supabase/functions/media-log-sync/index.ts`
+
+The production path uses Supabase Auth, a row owned by the signed-in user, row-level security, and a server-side merge before write.

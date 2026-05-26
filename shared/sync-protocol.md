@@ -68,7 +68,7 @@ Clients send:
 
 `Authorization: Bearer <token>`
 
-The local dev server uses a simple token. Production should use Supabase Auth and row-level security.
+The local dev server uses a simple token. Production uses Supabase Auth and row-level security.
 
 ## Offline Merge
 
