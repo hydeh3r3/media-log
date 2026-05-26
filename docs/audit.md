@@ -99,15 +99,16 @@ Manual store work still remains:
 
 ## iOS App
 
-The iOS folder now contains a Swift Package with a SwiftUI app. It has:
+The iOS folder now contains an Xcode project with a SwiftUI app. It has:
 
 - list, add, edit, and delete entry views
 - local persistence
 - sync settings
 - cloud sync with the same data model as Chrome
 - Keychain storage for the sync bearer token
+- app icon assets
 
-It still needs a signed Xcode project wrapper before device install, TestFlight, or App Store submission.
+It still needs a developer team set in Xcode before device install, TestFlight, or App Store submission.
 
 ## Sync Path
 

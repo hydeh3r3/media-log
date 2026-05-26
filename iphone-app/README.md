@@ -1,6 +1,6 @@
 # Media Log iOS App
 
-This folder contains the SwiftUI companion app source.
+This folder contains the SwiftUI companion app source and Xcode project.
 
 It can:
 
@@ -16,9 +16,17 @@ The app stores media log data in its local JSON file. The sync bearer token is s
 
 Run:
 
-`xcodebuild -scheme MediaLog -destination "generic/platform=iOS Simulator" build`
+`xcodebuild -project iphone-app/MediaLog.xcodeproj -scheme MediaLog -destination "generic/platform=iOS Simulator" build`
 
-This checks the SwiftUI app target from the Swift Package.
+This checks the SwiftUI app target from the Xcode project.
+
+## Open In Xcode
+
+Open:
+
+`iphone-app/MediaLog.xcodeproj`
+
+To install on a real iPhone, set your Apple developer team on the `MediaLog` target, then build and run from Xcode.
 
 ## Dev Sync
 

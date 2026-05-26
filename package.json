@@ -6,7 +6,7 @@
   "scripts": {
     "check:chrome": "node --check chrome-extension/popup.js",
     "check:firefox": "node --check firefox-extension/popup.js",
-    "check:ios": "cd iphone-app && xcodebuild -scheme MediaLog -destination 'generic/platform=iOS Simulator' build",
+    "check:ios": "xcodebuild -project iphone-app/MediaLog.xcodeproj -scheme MediaLog -destination 'generic/platform=iOS Simulator' build",
     "check:supabase": "node --check scripts/check-supabase-backend.js && bun run scripts/check-supabase-backend.js",
     "lint:chrome": "bun run scripts/lint-chrome-extension.js",
     "lint:firefox": "bunx --bun web-ext lint --source-dir firefox-extension",
