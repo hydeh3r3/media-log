@@ -48,7 +48,11 @@ Use these settings in the Sync tab:
 - Email: your Supabase account email
 - Password: your Supabase account password
 
-Click `Sign In`, then click `Sync Now`.
+Click `Sign Up` if you need a new account. If Supabase asks you to confirm your email, confirm it and then click `Sign In`.
+
+After sign-in, click `Sync Now`.
+
+Use `Reset Password` to send a Supabase password reset email. Supabase must have an Auth redirect URL set before the reset link can finish the password change.
 
 Do not use a service key in the extension. The password is used only for sign-in and is not saved.
 

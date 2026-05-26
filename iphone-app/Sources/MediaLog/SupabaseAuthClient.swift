@@ -24,6 +24,33 @@ struct SupabaseAuthClient {
         )
     }
 
+    func signUp(password: String) async throws -> SupabaseSession? {
+        guard !config.email.isEmpty, !password.isEmpty else {
+            throw SyncError.remote("Email and password are required.")
+        }
+
+        return try await authAction(
+            path: "signup",
+            body: [
+                "email": config.email,
+                "password": password
+            ]
+        )
+    }
+
+    func requestPasswordReset() async throws {
+        guard !config.email.isEmpty else {
+            throw SyncError.remote("Email is required.")
+        }
+
+        _ = try await authAction(
+            path: "recover",
+            body: [
+                "email": config.email
+            ]
+        )
+    }
+
     func refresh(refreshToken: String) async throws -> SupabaseSession {
         guard !refreshToken.isEmpty else {
             throw SyncError.remote("Sign in to Supabase first.")
@@ -47,6 +74,19 @@ struct SupabaseAuthClient {
         try validate(response: response, data: data)
     }
 
+    private func authAction(path: String, body: [String: String]) async throws -> SupabaseSession? {
+        var request = URLRequest(url: try authURL(path: path))
+        request.httpMethod = "POST"
+        request.setValue(config.supabasePublishableKey, forHTTPHeaderField: "apikey")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONEncoder.pretty.encode(body)
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+        try validate(response: response, data: data)
+        let authResponse = try? JSONDecoder().decode(SupabaseActionResponse.self, from: data)
+        return authResponse?.session(fallbackEmail: config.email)
+    }
+
     private func tokenRequest(grantType: String, body: [String: String]) async throws -> SupabaseSession {
         var components = URLComponents(url: try authURL(path: "token"), resolvingAgainstBaseURL: false)
         components?.queryItems = [URLQueryItem(name: "grant_type", value: grantType)]
@@ -65,12 +105,7 @@ struct SupabaseAuthClient {
         try validate(response: response, data: data)
         let authResponse = try JSONDecoder().decode(SupabaseTokenResponse.self, from: data)
 
-        return SupabaseSession(
-            accessToken: authResponse.accessToken,
-            refreshToken: authResponse.refreshToken,
-            expiresAt: Date().addingTimeInterval(TimeInterval(max(authResponse.expiresIn - 30, 1))),
-            userEmail: authResponse.user?.email ?? config.email
-        )
+        return authResponse.session(fallbackEmail: config.email)
     }
 
     private func authURL(path: String) throws -> URL {
@@ -113,6 +148,48 @@ private struct SupabaseTokenResponse: Codable {
         case refreshToken = "refresh_token"
         case expiresIn = "expires_in"
         case user
+    }
+
+    func session(fallbackEmail: String) -> SupabaseSession {
+        SupabaseSession(
+            accessToken: accessToken,
+            refreshToken: refreshToken,
+            expiresAt: Date().addingTimeInterval(TimeInterval(max(expiresIn - 30, 1))),
+            userEmail: user?.email ?? fallbackEmail
+        )
+    }
+}
+
+private struct SupabaseActionResponse: Codable {
+    var accessToken: String?
+    var refreshToken: String?
+    var expiresIn: Int?
+    var user: SupabaseUser?
+    var nestedSession: SupabaseTokenResponse?
+
+    enum CodingKeys: String, CodingKey {
+        case accessToken = "access_token"
+        case refreshToken = "refresh_token"
+        case expiresIn = "expires_in"
+        case user
+        case nestedSession = "session"
+    }
+
+    func session(fallbackEmail: String) -> SupabaseSession? {
+        if let nestedSession {
+            return nestedSession.session(fallbackEmail: user?.email ?? fallbackEmail)
+        }
+
+        guard let accessToken, let refreshToken else {
+            return nil
+        }
+
+        return SupabaseSession(
+            accessToken: accessToken,
+            refreshToken: refreshToken,
+            expiresAt: Date().addingTimeInterval(TimeInterval(max((expiresIn ?? 3600) - 30, 1))),
+            userEmail: user?.email ?? fallbackEmail
+        )
     }
 }
 

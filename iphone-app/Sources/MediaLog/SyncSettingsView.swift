@@ -43,6 +43,24 @@ struct SyncSettingsView: View {
                     }
                     .disabled(supabaseUrl.isEmpty || publishableKey.isEmpty || email.isEmpty || password.isEmpty)
 
+                    Button("Sign Up") {
+                        saveSettings()
+                        Task {
+                            await store.signUpToSupabase(password: password)
+                            password = ""
+                        }
+                    }
+                    .disabled(supabaseUrl.isEmpty || publishableKey.isEmpty || email.isEmpty || password.isEmpty)
+
+                    Button("Reset Password") {
+                        saveSettings()
+                        Task {
+                            await store.sendPasswordReset()
+                            password = ""
+                        }
+                    }
+                    .disabled(supabaseUrl.isEmpty || publishableKey.isEmpty || email.isEmpty)
+
                     Button("Sign Out") {
                         Task {
                             await store.signOutOfSupabase()

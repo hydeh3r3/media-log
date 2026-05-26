@@ -125,6 +125,34 @@ final class MediaLogStore {
         }
     }
 
+    func signUpToSupabase(password: String) async {
+        do {
+            if let session = try await SupabaseAuthClient(config: syncConfig).signUp(password: password) {
+                syncCredential.accessToken = session.accessToken
+                syncCredential.refreshToken = session.refreshToken
+                syncCredential.expiresAt = session.expiresAt
+                syncCredential.userEmail = session.userEmail
+                saveCredential()
+                syncStatus = "Signed up\(session.userEmail.isEmpty ? "." : " as \(session.userEmail).")"
+            } else {
+                syncStatus = "Account created. Check your email to confirm it, then sign in."
+            }
+            save()
+        } catch {
+            syncStatus = error.localizedDescription
+        }
+    }
+
+    func sendPasswordReset() async {
+        do {
+            try await SupabaseAuthClient(config: syncConfig).requestPasswordReset()
+            syncStatus = "Password reset email sent."
+            save()
+        } catch {
+            syncStatus = error.localizedDescription
+        }
+    }
+
     func signOutOfSupabase() async {
         if !syncCredential.accessToken.isEmpty {
             try? await SupabaseAuthClient(config: syncConfig).signOut(accessToken: syncCredential.accessToken)

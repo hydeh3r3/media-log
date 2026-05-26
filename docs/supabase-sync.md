@@ -24,15 +24,19 @@ The row is owned by the Supabase Auth user ID.
 
 ## Auth
 
-Use Supabase Auth to create your personal account.
+Use Supabase Auth for your personal account.
 
-Chrome and iOS sign in with your Supabase email and password. Supabase returns an access token and a refresh token.
+Chrome and iOS can sign up, sign in, sign out, and request a password reset email.
+
+Supabase returns an access token and a refresh token after sign-in. It may also return a session after sign-up if email confirmation is off.
 
 The iOS app stores the session in Keychain. The Chrome extension stores the session in extension storage.
 
 Passwords are not saved.
 
 The Edge Function checks the user token before it reads or writes data.
+
+For password reset emails, set your Supabase Auth redirect URL before using the reset link. The clients only send the reset request.
 
 ## Deploy
 
@@ -68,7 +72,7 @@ Use these settings in Chrome and iOS:
 - Email: your Supabase account email
 - User ID: `personal`
 
-Then sign in and sync.
+Then sign up or sign in, and sync.
 
 The Supabase function ignores the typed User ID for production data ownership. It uses the Auth user ID from the token.
 

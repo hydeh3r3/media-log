@@ -18,7 +18,7 @@ The app should not collect analytics, ads, or tracking data.
 
 Secrets and local exports must not be committed. Keep `.env`, local sync files, database files, and browser storage exports ignored.
 
-Production sync signs in through Supabase Auth. The clients store a Supabase session, not the account password.
+Production sync signs in through Supabase Auth. The clients can also request sign-up and password reset emails. They store a Supabase session, not the account password.
 
 The iOS app stores the session in Keychain. The local media log JSON file should not contain sync credentials.
 

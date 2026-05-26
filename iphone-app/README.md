@@ -59,6 +59,10 @@ Use these settings in the app:
 - Email: your Supabase account email
 - Password: your Supabase account password
 
-Tap `Sign In`, then tap `Sync Now`.
+Tap `Sign Up` if you need a new account. If Supabase asks you to confirm your email, confirm it and then tap `Sign In`.
+
+After sign-in, tap `Sync Now`.
+
+Use `Reset Password` to send a Supabase password reset email. Supabase must have an Auth redirect URL set before the reset link can finish the password change.
 
 Do not paste a service key into the app. The password is used only for sign-in and is not saved.

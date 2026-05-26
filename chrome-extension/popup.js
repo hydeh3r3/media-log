@@ -745,6 +745,39 @@ async function authRequest(config, grantType, body) {
   };
 }
 
+async function authActionRequest(config, path, body) {
+  const supabaseUrl = normalizeSupabaseUrl(config.supabaseUrl);
+  const response = await fetch(`${supabaseUrl}/auth/v1/${path}`, {
+    method: "POST",
+    headers: {
+      apikey: config.supabaseAnonKey,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(body),
+  });
+  const result = await response.json().catch(() => ({}));
+
+  if (!response.ok) {
+    throw new Error(result.error_description || result.msg || result.error || `Auth failed with ${response.status}`);
+  }
+
+  return result;
+}
+
+function sessionFromAuthResult(result, fallbackEmail) {
+  const tokenResult = result.session?.access_token ? result.session : result;
+  if (!tokenResult.access_token || !tokenResult.refresh_token) {
+    return null;
+  }
+
+  return {
+    accessToken: tokenResult.access_token,
+    refreshToken: tokenResult.refresh_token,
+    expiresAt: Date.now() + Math.max((tokenResult.expires_in || 3600) - 30, 1) * 1000,
+    userEmail: tokenResult.user?.email || result.user?.email || fallbackEmail || "",
+  };
+}
+
 async function signInWithSupabase(config, password) {
   if (!config.supabaseUrl || !config.supabaseAnonKey || !config.email || !password) {
     throw new Error("Supabase URL, key, email, and password are required.");
@@ -761,6 +794,42 @@ async function signInWithSupabase(config, password) {
   });
   await setStorage({ syncSession: session });
   return session;
+}
+
+async function signUpWithSupabase(config, password) {
+  if (!config.supabaseUrl || !config.supabaseAnonKey || !config.email || !password) {
+    throw new Error("Supabase URL, key, email, and password are required.");
+  }
+
+  const allowed = await requestSyncHostPermission(config.supabaseUrl);
+  if (!allowed) {
+    throw new Error("Supabase host permission was not granted.");
+  }
+
+  const result = await authActionRequest(config, "signup", {
+    email: config.email,
+    password,
+  });
+  const session = sessionFromAuthResult(result, config.email);
+  if (session) {
+    await setStorage({ syncSession: session });
+  }
+  return session;
+}
+
+async function requestSupabasePasswordReset(config) {
+  if (!config.supabaseUrl || !config.supabaseAnonKey || !config.email) {
+    throw new Error("Supabase URL, key, and email are required.");
+  }
+
+  const allowed = await requestSyncHostPermission(config.supabaseUrl);
+  if (!allowed) {
+    throw new Error("Supabase host permission was not granted.");
+  }
+
+  await authActionRequest(config, "recover", {
+    email: config.email,
+  });
 }
 
 async function refreshSupabaseSession(config, session) {
@@ -1466,6 +1535,43 @@ document.getElementById("btn-supabase-sign-in").addEventListener("click", async 
     document.getElementById("sync-password").value = "";
     await restoreSyncSettings();
     showSyncStatus(`Signed in${session.userEmail ? ` as ${session.userEmail}` : ""}.`);
+  } catch (error) {
+    showSyncStatus(getErrorMessage(error), true);
+  }
+});
+
+document.getElementById("btn-supabase-sign-up").addEventListener("click", async () => {
+  try {
+    const config = configForSave(getSyncConfigFromForm());
+    if (config.mode !== SYNC_MODES.SUPABASE) {
+      throw new Error("Switch sync mode to Supabase first.");
+    }
+
+    showSyncStatus("Creating account...");
+    const password = document.getElementById("sync-password").value;
+    const session = await signUpWithSupabase(config, password);
+    await setStorage({ syncConfig: config });
+    document.getElementById("sync-password").value = "";
+    await restoreSyncSettings();
+    showSyncStatus(session ? `Signed up${session.userEmail ? ` as ${session.userEmail}` : ""}.` : "Account created. Check your email to confirm it, then sign in.");
+  } catch (error) {
+    showSyncStatus(getErrorMessage(error), true);
+  }
+});
+
+document.getElementById("btn-supabase-reset").addEventListener("click", async () => {
+  try {
+    const config = configForSave(getSyncConfigFromForm());
+    if (config.mode !== SYNC_MODES.SUPABASE) {
+      throw new Error("Switch sync mode to Supabase first.");
+    }
+
+    showSyncStatus("Sending reset email...");
+    await requestSupabasePasswordReset(config);
+    await setStorage({ syncConfig: config });
+    document.getElementById("sync-password").value = "";
+    await restoreSyncSettings();
+    showSyncStatus("Password reset email sent.");
   } catch (error) {
     showSyncStatus(getErrorMessage(error), true);
   }
