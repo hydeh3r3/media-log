@@ -8,6 +8,14 @@ Run:
 
 The release zip is written to `dist/`.
 
+The same command verifies the zip contents. The package must contain only:
+
+- `manifest.json`
+- `popup.html`
+- `popup.css`
+- `popup.js`
+- extension icons
+
 Do not commit the zip. It is ignored on purpose.
 
 ## Required Manual Items

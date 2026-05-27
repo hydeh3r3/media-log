@@ -91,6 +91,7 @@ The extension now has:
 - store listing copy
 - screenshot guidance
 - a repeatable release package command
+- release zip content verification
 - no local website bridge code in the release package
 - a sync path that also works for iOS
 

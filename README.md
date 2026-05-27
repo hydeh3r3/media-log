@@ -62,6 +62,8 @@ bun run package:chrome
 
 The Chrome Web Store zip is created in `dist/`. Do not commit that zip.
 
+The package command also verifies the zip contents against the release allowlist.
+
 Chrome Web Store notes live in [docs/chrome-web-store.md](docs/chrome-web-store.md).
 
 ## iOS Development
