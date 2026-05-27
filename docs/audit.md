@@ -63,7 +63,7 @@ Each entry has:
 - `rating`, optional
 - `note`, optional
 
-Old local entries are prepared for sync by adding stable IDs and edit timestamps. The migration UI reports counts only.
+Old local entries are prepared for sync by adding stable IDs and edit timestamps. The migration UI reports counts only. The migration smoke test checks Chrome and Firefox with synthetic private-looking data and makes sure titles, URLs, and notes stay out of the report.
 
 ## Current Permissions
 
@@ -125,6 +125,6 @@ The repo now has two sync paths:
 
 The production path uses Supabase Auth, a row owned by the signed-in user, row-level security, and a server-side merge before write.
 
-`bun run verify` now runs a safe local sync smoke test. It starts the local sync server on a temporary port, writes one synthetic entry, reads it back, and deletes the temporary file.
+`bun run verify` now runs safe migration, Stripe webhook, and local sync smoke tests. The migration test checks count-only reports. The sync smoke test starts the local sync server on a temporary port, writes one synthetic entry, reads it back, and deletes the temporary file.
 
 Production sync is gated by a `$2` PostgreSQL entitlement row in `media_log_sync_entitlements`. Stripe Checkout creates the payment session, and a Stripe webhook activates the entitlement after payment.

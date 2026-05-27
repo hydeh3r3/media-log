@@ -35,7 +35,7 @@ Run:
 bun run verify
 ```
 
-This checks the Chrome source, lints the Chrome release manifest, builds the Chrome release zip, checks the Firefox and Zen source, checks the Supabase backend files, runs a Stripe webhook smoke test, runs a local sync smoke test, and builds the iOS app for the simulator.
+This checks the Chrome source, lints the Chrome release manifest, builds the Chrome release zip, checks the Firefox and Zen source, checks the Supabase backend files, runs safe migration and Stripe webhook smoke tests, runs a local sync smoke test, and builds the iOS app for the simulator.
 
 ## Chrome Development
 
@@ -129,6 +129,12 @@ In the Chrome extension, open Sync and click `Prepare Local Data`.
 This adds missing IDs and timestamps to old local entries. It only shows counts. It does not print titles, URLs, or notes.
 
 After that, sign in and click `Sync Now`.
+
+The private-data-safe migration smoke test runs with:
+
+```sh
+bun run check:migration
+```
 
 ## Still Manual
 

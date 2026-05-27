@@ -70,13 +70,13 @@ The local backend is:
 
 - `scripts/sync-dev-server.js`
 
-The one-command verification path runs safe sync and Stripe webhook smoke tests:
+The one-command verification path runs safe migration, sync, and Stripe webhook smoke tests:
 
 ```sh
 bun run verify
 ```
 
-That command also checks the Firefox and Zen source. The sync smoke test writes one synthetic entry to a temporary local server and reads it back. The Stripe webhook smoke test signs fake events and checks that only a paid `$2` USD checkout unlocks sync. These tests do not use private log data.
+That command also checks the Firefox and Zen source. The migration smoke test runs Chrome and Firefox with synthetic private-looking data and checks that reports stay count-only. The sync smoke test writes one synthetic entry to a temporary local server and reads it back. The Stripe webhook smoke test signs fake events and checks that only a paid `$2` USD checkout unlocks sync. These tests do not use private log data.
 
 ## Storage Shape
 

@@ -125,6 +125,12 @@ After that, click `Sync Now` to upload the merged snapshot.
 
 If sync returns `Cross-device sync requires the $2 sync unlock.`, finish checkout or create the user's row in `media_log_sync_entitlements` by hand.
 
+Run the safe migration smoke test with:
+
+```sh
+bun run check:migration
+```
+
 ## Safety Notes
 
 - Row-level security is enabled on `media_log_records`.
