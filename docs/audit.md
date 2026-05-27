@@ -126,4 +126,4 @@ The production path uses Supabase Auth, a row owned by the signed-in user, row-l
 
 `bun run verify` now runs a safe local sync smoke test. It starts the local sync server on a temporary port, writes one synthetic entry, reads it back, and deletes the temporary file.
 
-Production sync is gated by a `$2` PostgreSQL entitlement row in `media_log_sync_entitlements`.
+Production sync is gated by a `$2` PostgreSQL entitlement row in `media_log_sync_entitlements`. Stripe Checkout creates the payment session, and a Stripe webhook activates the entitlement after payment.

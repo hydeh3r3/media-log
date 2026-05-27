@@ -18,6 +18,7 @@ const SYNC_MODES = {
   LOCAL: "local",
 };
 const SUPABASE_SYNC_PATH = "/functions/v1/media-log-sync";
+const SUPABASE_CHECKOUT_PATH = "/functions/v1/media-log-checkout";
 const TOKEN_REFRESH_MARGIN_MS = 60_000;
 
 const MONTHS = [
@@ -700,6 +701,10 @@ function supabaseFunctionEndpoint(supabaseUrl) {
   return `${normalizeSupabaseUrl(supabaseUrl)}${SUPABASE_SYNC_PATH}`;
 }
 
+function supabaseCheckoutEndpoint(supabaseUrl) {
+  return `${normalizeSupabaseUrl(supabaseUrl)}${SUPABASE_CHECKOUT_PATH}`;
+}
+
 function syncResourceUrl(endpoint, userId) {
   const url = new URL(normalizeEndpoint(endpoint));
   url.searchParams.set("userId", userId || "personal");
@@ -884,6 +889,44 @@ async function getSyncAuth(config, storedSession) {
     token: session.accessToken,
     userId: config.userId || "personal",
   };
+}
+
+async function createSyncUnlockCheckout(config, storedSession) {
+  if ((config.mode || SYNC_MODES.SUPABASE) !== SYNC_MODES.SUPABASE) {
+    throw new Error("Switch sync mode to Supabase first.");
+  }
+
+  const allowed = await requestSyncHostPermission(config.supabaseUrl);
+  if (!allowed) {
+    throw new Error("Supabase host permission was not granted.");
+  }
+
+  const auth = await getSyncAuth(config, storedSession);
+  const response = await fetch(supabaseCheckoutEndpoint(config.supabaseUrl), {
+    method: "POST",
+    headers: {
+      apikey: config.supabaseAnonKey,
+      Authorization: `Bearer ${auth.token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({}),
+  });
+  const result = await response.json();
+
+  if (!response.ok || !result.ok || !result.checkoutUrl) {
+    throw new Error(result.error || `Checkout failed with ${response.status}`);
+  }
+
+  return result.checkoutUrl;
+}
+
+async function openExternalUrl(url) {
+  if (chrome.tabs?.create) {
+    await chrome.tabs.create({ url });
+    return;
+  }
+
+  window.open(url, "_blank", "noopener");
 }
 
 async function fetchSyncRecord(config) {
@@ -1584,6 +1627,25 @@ document.getElementById("btn-supabase-sign-out").addEventListener("click", async
     await signOutOfSupabase(config, data.syncSession || null);
     await restoreSyncSettings();
     showSyncStatus("Signed out.");
+  } catch (error) {
+    showSyncStatus(getErrorMessage(error), true);
+  }
+});
+
+document.getElementById("btn-sync-unlock").addEventListener("click", async () => {
+  try {
+    const data = await getStorage();
+    const config = configForSave(getSyncConfigFromForm());
+    if (config.mode !== SYNC_MODES.SUPABASE) {
+      throw new Error("Switch sync mode to Supabase first.");
+    }
+
+    showSyncStatus("Opening checkout...");
+    await setStorage({ syncConfig: config });
+    const checkoutUrl = await createSyncUnlockCheckout(config, data.syncSession || null);
+    await restoreSyncSettings();
+    await openExternalUrl(checkoutUrl);
+    showSyncStatus("Checkout opened. Sync will unlock after payment.");
   } catch (error) {
     showSyncStatus(getErrorMessage(error), true);
   }

@@ -101,7 +101,7 @@ The local sync file is written under `.local-sync/`, which is ignored by git.
 
 Production sync uses Supabase.
 
-Cross-device sync is gated by a `$2` entitlement row in PostgreSQL. Details live in [docs/paid-sync.md](docs/paid-sync.md).
+Cross-device sync is gated by a `$2` entitlement row in PostgreSQL. The clients can open a Stripe Checkout page after sign-in. Details live in [docs/paid-sync.md](docs/paid-sync.md).
 
 Deploy:
 
@@ -133,6 +133,7 @@ After that, sign in and click `Sync Now`.
 These steps need live accounts or private data:
 
 - create and deploy the real Supabase project
+- set Stripe checkout and webhook secrets in Supabase
 - set Supabase Auth redirect URLs
 - upload the Chrome release zip to the Chrome Web Store
 - answer the Chrome Web Store privacy form

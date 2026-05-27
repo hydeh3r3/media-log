@@ -76,13 +76,15 @@ The API path is:
 
 Clients send a bearer token. The local dev server uses a simple token. The Supabase version signs in with email/password, refreshes the session before sync, and uses row-level security.
 
-Production sync is paid. Supabase checks the signed-in user's PostgreSQL row in `media_log_sync_entitlements` before it reads or writes media log data. The unlock price is `$2`.
+Production sync is paid. Supabase checks the signed-in user's PostgreSQL row in `media_log_sync_entitlements` before it reads or writes media log data. The unlock price is `$2`. Stripe Checkout opens the payment page, and the Stripe webhook activates the entitlement row.
 
 The deployable Supabase files live in:
 
 - `supabase/migrations/20260526173000_create_media_log_records.sql`
 - `supabase/migrations/20260527031500_create_media_log_sync_entitlements.sql`
 - `supabase/functions/media-log-sync/index.ts`
+- `supabase/functions/media-log-checkout/index.ts`
+- `supabase/functions/media-log-stripe-webhook/index.ts`
 
 Setup steps are in `docs/supabase-sync.md`.
 

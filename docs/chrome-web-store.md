@@ -32,7 +32,7 @@ Use it to save articles, manga, anime, films, TV shows, music, games, books, and
 
 Your data stays in browser storage unless you set up sync. Production sync uses Supabase Auth, row-level security, and the `media-log-sync` Edge Function. Local dev sync uses the endpoint and token you choose.
 
-Cross-device sync is a paid `$2` unlock. The payment provider handles checkout. Media Log stores only the sync entitlement status in PostgreSQL.
+Cross-device sync is a paid `$2` unlock. Stripe handles checkout and card storage. Media Log stores only the sync entitlement status and Stripe references in PostgreSQL.
 
 ## Permission Notes
 

@@ -4,11 +4,19 @@ Supabase is the production sync path for Media Log.
 
 Production cross-device sync is a paid feature. The unlock price is `$2`.
 
-The Chrome extension and iOS app both talk to one HTTPS function:
+The Chrome extension and iOS app both talk to this HTTPS function for sync:
 
 `https://<project-ref>.supabase.co/functions/v1/media-log-sync`
 
 The clients may append `/v1/media-log` to that URL. The function supports that path.
+
+They also call this function to start the paid unlock:
+
+`https://<project-ref>.supabase.co/functions/v1/media-log-checkout`
+
+Stripe calls this webhook after payment:
+
+`https://<project-ref>.supabase.co/functions/v1/media-log-stripe-webhook`
 
 ## What It Stores
 
@@ -63,6 +71,8 @@ bunx supabase login
 bunx supabase link --project-ref <project-ref>
 bunx supabase db push
 bunx supabase functions deploy media-log-sync
+bunx supabase functions deploy media-log-checkout
+bunx supabase functions deploy media-log-stripe-webhook
 ```
 
 Supabase provides these function secrets by default:
@@ -78,6 +88,15 @@ Older projects may expose:
 
 The function supports both forms. Do not commit any secret value.
 
+Set these Stripe secrets before paid checkout:
+
+- `STRIPE_SECRET_KEY`
+- `STRIPE_WEBHOOK_SECRET`
+- `MEDIA_LOG_CHECKOUT_SUCCESS_URL`
+- `MEDIA_LOG_CHECKOUT_CANCEL_URL`
+
+The checkout function uses Stripe Checkout for a `$2` payment. The webhook writes the paid entitlement to PostgreSQL.
+
 ## Client Settings
 
 Use these settings in Chrome and iOS:
@@ -88,7 +107,9 @@ Use these settings in Chrome and iOS:
 - Email: your Supabase account email
 - User ID: `personal`
 
-Then sign up or sign in, and sync.
+Then sign up or sign in. Click or tap `Unlock Sync ($2)` to open Stripe Checkout.
+
+After payment, click or tap `Sync Now`.
 
 The Supabase function ignores the typed User ID for production data ownership. It uses the Auth user ID from the token.
 
@@ -102,7 +123,7 @@ This adds missing IDs and timestamps to old browser entries. It only shows count
 
 After that, click `Sync Now` to upload the merged snapshot.
 
-If sync returns `Cross-device sync requires the $2 sync unlock.`, create or activate the user's row in `media_log_sync_entitlements`.
+If sync returns `Cross-device sync requires the $2 sync unlock.`, finish checkout or create the user's row in `media_log_sync_entitlements` by hand.
 
 ## Safety Notes
 

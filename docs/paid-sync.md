@@ -48,11 +48,67 @@ The message is:
 Cross-device sync requires the $2 sync unlock.
 ```
 
-## Payment Provider
+## Stripe Checkout
 
 The repo does not store card data.
 
-A payment provider should handle checkout and card storage. After payment succeeds, a webhook or admin action should upsert the PostgreSQL entitlement row.
+Stripe handles checkout and card storage.
+
+The clients call this Supabase Edge Function after sign-in:
+
+```text
+https://<project-ref>.supabase.co/functions/v1/media-log-checkout
+```
+
+That function creates a Stripe Checkout Session for one payment:
+
+- amount: `$2`
+- currency: `usd`
+- product: `Media Log Sync Unlock`
+
+The function adds the Supabase Auth user ID to Stripe metadata. The client never receives a Stripe secret key.
+
+## Stripe Webhook
+
+Stripe should send payment events to this Supabase Edge Function:
+
+```text
+https://<project-ref>.supabase.co/functions/v1/media-log-stripe-webhook
+```
+
+The webhook verifies the `Stripe-Signature` header. It only unlocks sync for paid Checkout Sessions with `amount_total` `200` and currency `usd`.
+
+Handled events:
+
+- `checkout.session.completed`
+- `checkout.session.async_payment_succeeded`
+
+After payment succeeds, the webhook upserts the PostgreSQL entitlement row.
+
+## Required Secrets
+
+Set these Supabase function secrets:
+
+- `STRIPE_SECRET_KEY`
+- `STRIPE_WEBHOOK_SECRET`
+- `MEDIA_LOG_CHECKOUT_SUCCESS_URL`
+- `MEDIA_LOG_CHECKOUT_CANCEL_URL`
+
+Supabase also provides these:
+
+- `SUPABASE_URL`
+- `SUPABASE_PUBLISHABLE_KEYS`
+- `SUPABASE_SECRET_KEYS`
+
+Do not commit any secret value.
+
+Deploy with:
+
+```sh
+bun run supabase:deploy
+```
+
+## Manual Unlock
 
 Example manual unlock:
 
@@ -81,7 +137,7 @@ on conflict (user_id) do update set
   expires_at = null;
 ```
 
-Use the Supabase SQL editor or a trusted server-side webhook for this. Do not run entitlement writes from the Chrome extension or iOS app.
+Use the Supabase SQL editor only if Stripe is not ready yet. Do not run entitlement writes from the Chrome extension or iOS app.
 
 ## Local Development
 

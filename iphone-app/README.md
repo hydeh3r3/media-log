@@ -64,10 +64,12 @@ Use these settings in the app:
 
 Tap `Sign Up` if you need a new account. If Supabase asks you to confirm your email, confirm it and then tap `Sign In`.
 
-After sign-in, tap `Sync Now`.
+After sign-in, tap `Unlock Sync ($2)` to open Stripe Checkout.
+
+After payment, tap `Sync Now`.
 
 Use `Reset Password` to send a Supabase password reset email. Supabase must have an Auth redirect URL set before the reset link can finish the password change.
 
 Do not paste a service key into the app. The password is used only for sign-in and is not saved.
 
-If sync says `Cross-device sync requires the $2 sync unlock.`, activate the user's sync entitlement in Supabase.
+If sync says `Cross-device sync requires the $2 sync unlock.`, finish checkout or activate the user's sync entitlement in Supabase.

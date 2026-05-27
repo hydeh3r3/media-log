@@ -19,6 +19,7 @@
 		A00000000000000000000023 /* WeekMath.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000022 /* WeekMath.swift */; };
 		A00000000000000000000025 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000024 /* Assets.xcassets */; };
 		A00000000000000000000028 /* SupabaseAuthClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000027 /* SupabaseAuthClient.swift */; };
+		A0000000000000000000002A /* SyncCheckoutClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000029 /* SyncCheckoutClient.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -36,6 +37,7 @@
 		A00000000000000000000024 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		A00000000000000000000026 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		A00000000000000000000027 /* SupabaseAuthClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SupabaseAuthClient.swift; sourceTree = "<group>"; };
+		A00000000000000000000029 /* SyncCheckoutClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncCheckoutClient.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -77,6 +79,7 @@
 				A00000000000000000000018 /* MediaLogStore.swift */,
 				A0000000000000000000001A /* Models.swift */,
 				A0000000000000000000001C /* SyncClient.swift */,
+				A00000000000000000000029 /* SyncCheckoutClient.swift */,
 				A0000000000000000000001E /* SyncMerge.swift */,
 				A00000000000000000000020 /* SyncSettingsView.swift */,
 				A00000000000000000000027 /* SupabaseAuthClient.swift */,
@@ -162,6 +165,7 @@
 				A0000000000000000000001B /* Models.swift in Sources */,
 				A0000000000000000000001D /* SyncClient.swift in Sources */,
 				A0000000000000000000001F /* SyncMerge.swift in Sources */,
+				A0000000000000000000002A /* SyncCheckoutClient.swift in Sources */,
 				A00000000000000000000021 /* SyncSettingsView.swift in Sources */,
 				A00000000000000000000028 /* SupabaseAuthClient.swift in Sources */,
 				A00000000000000000000023 /* WeekMath.swift in Sources */,

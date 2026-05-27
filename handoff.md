@@ -64,7 +64,7 @@ The production backend is Supabase:
 - `supabase/migrations/20260526173000_create_media_log_records.sql`
 - `supabase/functions/media-log-sync/index.ts`
 
-Production sync is gated by a `$2` PostgreSQL entitlement row in `media_log_sync_entitlements`.
+Production sync is gated by a `$2` PostgreSQL entitlement row in `media_log_sync_entitlements`. The repo now includes a Stripe Checkout function and Stripe webhook function, but the live Stripe secrets still need to be set in Supabase.
 
 The local backend is:
 

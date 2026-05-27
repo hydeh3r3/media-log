@@ -2,3 +2,9 @@ project_id = "media-log"
 
 [functions.media-log-sync]
 verify_jwt = true
+
+[functions.media-log-checkout]
+verify_jwt = true
+
+[functions.media-log-stripe-webhook]
+verify_jwt = false

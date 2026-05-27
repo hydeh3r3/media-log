@@ -24,4 +24,4 @@ The iOS app stores the session in Keychain. The local media log JSON file should
 
 The Chrome extension stores the session in extension storage. The Supabase service key belongs only in Supabase function secrets.
 
-Paid sync uses a PostgreSQL entitlement row. The repo stores sync status and payment provider references, not card data.
+Paid sync uses a PostgreSQL entitlement row. Stripe handles checkout and card storage. The repo stores sync status and Stripe references, not card data.

@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct SyncSettingsView: View {
+    @Environment(\.openURL) private var openURL
     @Bindable var store: MediaLogStore
     @State private var mode: SyncMode = .supabase
     @State private var endpoint: String = ""
@@ -67,6 +68,15 @@ struct SyncSettingsView: View {
                         }
                     }
                     .disabled(store.syncCredential.accessToken.isEmpty)
+
+                    Button("Unlock Sync ($2)") {
+                        saveSettings()
+                        Task {
+                            guard let checkoutURL = await store.syncUnlockCheckoutURL() else { return }
+                            openURL(checkoutURL)
+                        }
+                    }
+                    .disabled(supabaseUrl.isEmpty || publishableKey.isEmpty || store.syncCredential.accessToken.isEmpty)
                 }
 
                 TextField("User ID", text: $userId)

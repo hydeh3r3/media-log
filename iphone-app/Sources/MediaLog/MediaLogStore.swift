@@ -183,6 +183,24 @@ final class MediaLogStore {
         }
     }
 
+    func syncUnlockCheckoutURL() async -> URL? {
+        do {
+            guard syncConfig.mode == .supabase else {
+                throw SyncError.remote("Switch sync mode to Supabase first.")
+            }
+
+            let token = try await syncTokenForRequest()
+            let checkoutUrl = try await SyncCheckoutClient(config: syncConfig, token: token).createCheckoutURL()
+            syncStatus = "Checkout opened. Sync will unlock after payment."
+            save()
+            return checkoutUrl
+        } catch {
+            syncStatus = error.localizedDescription
+            save()
+            return nil
+        }
+    }
+
     private func syncTokenForRequest() async throws -> String {
         switch syncConfig.mode {
         case .local:
