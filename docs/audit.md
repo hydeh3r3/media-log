@@ -112,9 +112,12 @@ The iOS folder now contains an Xcode project with a SwiftUI app. It has:
 - cloud sync with the same data model as Chrome
 - Supabase email/password sign-in
 - Keychain storage for the iOS sync session
-- app icon assets
+- iPhone and iPad app icon assets
+- release-readiness checks for metadata, icons, and credential storage
 
 It still needs a developer team set in Xcode before device install, TestFlight, or App Store submission.
+
+Before App Store review, choose the paid-sync route for iOS. The current personal build can open Stripe Checkout for the `$2` sync unlock. Store submission may need StoreKit, an allowed external purchase route, or no in-app purchase call to action. The checklist lives in `docs/app-store.md`.
 
 ## Sync Path
 

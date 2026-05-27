@@ -8,7 +8,7 @@ Run the full local check first:
 bun run verify
 ```
 
-That command checks the Chrome package, Firefox source, Supabase backend files, safe migration flow, Stripe webhook rules, local sync merge flow, and iOS simulator build.
+That command checks the Chrome package, Firefox source, Supabase backend files, safe migration flow, Stripe webhook rules, local sync merge flow, iOS simulator build, and iOS release readiness.
 
 ## Chrome Development Install
 
@@ -101,7 +101,15 @@ Build the simulator target with:
 bun run check:ios
 ```
 
+Run the release-readiness check with:
+
+```sh
+bun run check:ios-release
+```
+
 To install on a real iPhone, set your Apple developer team on the `MediaLog` target in Xcode. Then build and run from Xcode.
+
+App Store and TestFlight notes live in `docs/app-store.md`.
 
 ## Local Dev Sync
 
@@ -197,6 +205,7 @@ These steps still need live accounts, private browser data, or store access:
 - create and link the real Supabase project
 - set Stripe checkout and webhook secrets in Supabase
 - set Supabase Auth redirect URLs
+- choose the App Store paid-sync route before App Review
 - run the real browser-data migration from your installed extension
 - pay through Stripe Checkout or add your manual entitlement row
 - upload the Chrome release zip to the Chrome Web Store

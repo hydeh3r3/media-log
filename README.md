@@ -35,7 +35,7 @@ Run:
 bun run verify
 ```
 
-This checks the Chrome source, lints the Chrome release manifest, builds the Chrome release zip, checks the Firefox and Zen source, checks the Supabase backend files, checks the install handoff, runs safe migration and Stripe webhook smoke tests, runs a local sync smoke test, and builds the iOS app for the simulator.
+This checks the Chrome source, lints the Chrome release manifest, builds the Chrome release zip, checks the Firefox and Zen source, checks the Supabase backend files, checks the install handoff, runs safe migration and Stripe webhook smoke tests, runs a local sync smoke test, builds the iOS app for the simulator, and runs the iOS release checks.
 
 Install and test steps live in [docs/install-test.md](docs/install-test.md).
 
@@ -82,7 +82,15 @@ Build check:
 bun run check:ios
 ```
 
+Release check:
+
+```sh
+bun run check:ios-release
+```
+
 To install on a real iPhone, set your Apple developer team on the `MediaLog` target in Xcode, then build and run.
+
+App Store and TestFlight notes live in [docs/app-store.md](docs/app-store.md).
 
 ## Local Sync
 
@@ -145,6 +153,7 @@ These steps need live accounts or private data:
 - create and deploy the real Supabase project
 - set Stripe checkout and webhook secrets in Supabase
 - set Supabase Auth redirect URLs
+- choose the App Store paid-sync route before App Review
 - upload the Chrome release zip to the Chrome Web Store
 - answer the Chrome Web Store privacy form with `docs/chrome-web-store-privacy.md`
 - run the real browser-data migration from your installed extension

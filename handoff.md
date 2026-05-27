@@ -57,6 +57,12 @@ Build check:
 bun run check:ios
 ```
 
+Release check:
+
+```sh
+bun run check:ios-release
+```
+
 ## Current Sync Path
 
 The production backend is Supabase:
@@ -108,6 +114,7 @@ These steps need user accounts, private browser data, or store access:
 
 - create and link the real Supabase project
 - deploy the Supabase migration and Edge Function
+- choose the App Store paid-sync route before App Review
 - set Supabase Auth redirect URLs
 - run the real Chrome storage migration
 - upload the Chrome release zip to the Chrome Web Store
@@ -120,6 +127,7 @@ These steps need user accounts, private browser data, or store access:
 - [docs/audit.md](docs/audit.md)
 - [docs/install-test.md](docs/install-test.md)
 - [docs/supabase-sync.md](docs/supabase-sync.md)
+- [docs/app-store.md](docs/app-store.md)
 - [docs/chrome-web-store.md](docs/chrome-web-store.md)
 - [docs/chrome-web-store-privacy.md](docs/chrome-web-store-privacy.md)
 - [docs/privacy.md](docs/privacy.md)

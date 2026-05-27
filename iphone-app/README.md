@@ -21,6 +21,12 @@ Run:
 
 This checks the SwiftUI app target from the Xcode project.
 
+Run the fuller release check from the repo root:
+
+`bun run check:ios-release`
+
+This checks the Release simulator build, app icons, app metadata, Keychain credential storage, and App Store prep notes.
+
 ## Open In Xcode
 
 Open:
@@ -28,6 +34,8 @@ Open:
 `iphone-app/MediaLog.xcodeproj`
 
 To install on a real iPhone, set your Apple developer team on the `MediaLog` target, then build and run from Xcode.
+
+App Store and TestFlight notes live in `docs/app-store.md`.
 
 ## Dev Sync
 
@@ -53,6 +61,8 @@ Deploy the Supabase backend from the repo root:
 Setup steps are in `docs/supabase-sync.md`.
 
 Cross-device sync requires the `$2` sync unlock. The unlock is stored in PostgreSQL by the Supabase backend.
+
+The personal build opens Stripe Checkout. Before App Store review, choose the iOS paid-sync route in `docs/app-store.md`.
 
 Use these settings in the app:
 

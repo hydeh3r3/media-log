@@ -6,6 +6,7 @@ const REQUIRED_FILES = [
   "docs/install-test.md",
   "docs/paid-sync.md",
   "docs/supabase-sync.md",
+  "docs/app-store.md",
   "docs/chrome-web-store.md",
   "docs/chrome-web-store-privacy.md",
   "docs/privacy.md",
@@ -31,6 +32,8 @@ const INSTALL_GUIDE_REQUIREMENTS = [
   ["temporary add-on restart note", "Temporary add-ons unload"],
   ["Firefox lint command", "bun run lint:firefox"],
   ["iOS simulator build command", "bun run check:ios"],
+  ["iOS release check command", "bun run check:ios-release"],
+  ["iOS App Store docs", "docs/app-store.md"],
   ["Apple team manual step", "Apple developer team"],
   ["local sync command", "bun run sync:dev"],
   ["local sync endpoint", "http://127.0.0.1:43189"],
@@ -49,6 +52,7 @@ const INSTALL_GUIDE_REQUIREMENTS = [
   ["paid sync price", "$2"],
   ["Stripe Checkout", "Stripe Checkout"],
   ["payment required response", "402 Payment Required"],
+  ["App Review paid sync route", "App Review"],
   ["migration button", "Prepare Local Data"],
   ["migration privacy wording", "counts only"],
   ["migration smoke test", "bun run check:migration"],
@@ -57,7 +61,9 @@ const INSTALL_GUIDE_REQUIREMENTS = [
 
 const CROSS_DOC_REQUIREMENTS = [
   ["README links install guide", "README.md", "docs/install-test.md"],
+  ["README links App Store guide", "README.md", "docs/app-store.md"],
   ["handoff links install guide", "handoff.md", "docs/install-test.md"],
+  ["handoff links App Store guide", "handoff.md", "docs/app-store.md"],
   ["paid sync docs name PostgreSQL", "docs/paid-sync.md", "PostgreSQL"],
   ["paid sync docs lock price", "docs/paid-sync.md", "$2"],
   ["paid sync docs name entitlement table", "docs/paid-sync.md", "media_log_sync_entitlements"],
@@ -85,6 +91,12 @@ const CROSS_DOC_REQUIREMENTS = [
   ["privacy policy mentions Stripe", "docs/privacy.md", "Stripe"],
   ["Firefox docs mention Zen reload path", "firefox-extension/README.md", "about:debugging#/runtime/this-firefox"],
   ["iOS docs mention paid sync unlock", "iphone-app/README.md", "Unlock Sync ($2)"],
+  ["iOS docs mention release check", "iphone-app/README.md", "bun run check:ios-release"],
+  ["App Store docs mention guideline", "docs/app-store.md", "App Store Review Guideline 3.1.1"],
+  ["App Store docs mention StoreKit", "docs/app-store.md", "StoreKit"],
+  ["App Store docs mention TestFlight", "docs/app-store.md", "TestFlight"],
+  ["App Store docs mention App Privacy", "docs/app-store.md", "App Privacy"],
+  ["App Store docs mention Stripe Checkout", "docs/app-store.md", "Stripe Checkout"],
 ];
 
 function assert(condition, message) {
