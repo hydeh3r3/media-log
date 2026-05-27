@@ -8,7 +8,7 @@ Run the full local check first:
 bun run verify
 ```
 
-That command checks the Chrome package, Firefox source, Supabase backend files, safe migration flow, Stripe webhook rules, local sync merge flow, iOS simulator build, and iOS release readiness.
+That command checks the Chrome package, Firefox source and lint, Supabase backend files, safe migration flow, Stripe webhook rules, local sync merge flow, iOS simulator build, and iOS release readiness.
 
 ## Chrome Development Install
 

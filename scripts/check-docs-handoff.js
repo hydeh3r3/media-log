@@ -3,6 +3,7 @@ import { readFile } from "node:fs/promises";
 const REQUIRED_FILES = [
   "README.md",
   "handoff.md",
+  "package.json",
   "docs/install-test.md",
   "docs/paid-sync.md",
   "docs/supabase-sync.md",
@@ -31,6 +32,7 @@ const INSTALL_GUIDE_REQUIREMENTS = [
   ["Firefox manifest path", "/Users/wetbrain/Documents/workspace/media-log/firefox-extension/manifest.json"],
   ["temporary add-on restart note", "Temporary add-ons unload"],
   ["Firefox lint command", "bun run lint:firefox"],
+  ["Firefox lint in full verify", "Firefox source and lint"],
   ["iOS simulator build command", "bun run check:ios"],
   ["iOS release check command", "bun run check:ios-release"],
   ["iOS App Store docs", "docs/app-store.md"],
@@ -62,6 +64,7 @@ const INSTALL_GUIDE_REQUIREMENTS = [
 const CROSS_DOC_REQUIREMENTS = [
   ["README links install guide", "README.md", "docs/install-test.md"],
   ["README links App Store guide", "README.md", "docs/app-store.md"],
+  ["verify runs Firefox lint", "package.json", "bun run lint:firefox"],
   ["handoff links install guide", "handoff.md", "docs/install-test.md"],
   ["handoff links App Store guide", "handoff.md", "docs/app-store.md"],
   ["paid sync docs name PostgreSQL", "docs/paid-sync.md", "PostgreSQL"],

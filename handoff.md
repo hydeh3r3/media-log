@@ -82,7 +82,7 @@ The one-command verification path runs safe migration, sync, and Stripe webhook 
 bun run verify
 ```
 
-That command also checks the Firefox and Zen source. The migration smoke test runs Chrome and Firefox with synthetic private-looking data and checks that reports stay count-only. The sync smoke test writes one synthetic entry to a temporary local server, then simulates two offline clients and verifies both entries survive the merge. The Stripe webhook smoke test signs fake events and checks that only a paid `$2` USD checkout unlocks sync. These tests do not use private log data.
+That command also checks and lints the Firefox and Zen source. The migration smoke test runs Chrome and Firefox with synthetic private-looking data and checks that reports stay count-only. The sync smoke test writes one synthetic entry to a temporary local server, then simulates two offline clients and verifies both entries survive the merge. The Stripe webhook smoke test signs fake events and checks that only a paid `$2` USD checkout unlocks sync. These tests do not use private log data.
 
 The install handoff is checked too. It must keep the Chrome, Firefox or Zen, iOS, Supabase, Stripe, paid sync, PostgreSQL, and migration steps documented.
 
