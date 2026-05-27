@@ -80,7 +80,7 @@ Run:
 bun run check:sync
 ```
 
-This starts the local sync server on a temporary port, syncs one safe synthetic entry, reads it back, and deletes the temporary data file.
+This starts the local sync server on a temporary port, syncs one safe synthetic entry, checks a two-client offline merge, reads the data back, and deletes the temporary data file.
 
 ## Offline Merge
 
@@ -91,3 +91,5 @@ Clients merge before they upload:
 - deleted entries are stored in `tombstones`
 - a tombstone wins when its delete time is newer than the entry edit time
 - drafts use newest `updatedAt`
+
+The local dev sync server follows the same merge rule as the production Supabase function. That keeps local smoke tests useful when real backend credentials are not set.

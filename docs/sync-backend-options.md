@@ -101,4 +101,4 @@ Rules:
 - A tombstone wins when its delete time is newer than the entry edit time.
 - Drafts use newest `updatedAt`.
 
-This is enough for personal offline use across Chrome and iOS. The Supabase function also merges incoming data with the stored row before it writes.
+This is enough for personal offline use across Chrome and iOS. The Supabase function also merges incoming data with the stored row before it writes. The local dev server follows the same merge rule so safe local smoke tests can catch overwrite regressions.

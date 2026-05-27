@@ -7,6 +7,8 @@ const ROOT = new URL("..", import.meta.url).pathname;
 const DEV_TOKEN = "dev-media-log-token";
 const USER_ID = "sync-smoke-user";
 const SAFE_ENTRY_TITLE = "Safe Sync Smoke Test";
+const SAFE_OFFLINE_A_TITLE = "Safe Offline Client A";
+const SAFE_OFFLINE_B_TITLE = "Safe Offline Client B";
 
 function assert(condition, message) {
   if (!condition) {
@@ -102,6 +104,34 @@ function smokeSnapshot() {
   };
 }
 
+function offlineSnapshot(entry) {
+  return {
+    currentWeek: {
+      weekStart: "2026-06-01",
+      weekEnd: "2026-06-07",
+      weekNumber: 23,
+      year: 2026,
+      entries: [entry],
+    },
+    history: [],
+    addDraft: null,
+    tombstones: {},
+  };
+}
+
+function safeEntry(id, title, createdAt) {
+  return {
+    id,
+    type: "article",
+    title,
+    date: "2026-06-02",
+    createdAt,
+    updatedAt: createdAt,
+    url: `https://example.com/${id}`,
+    note: "Synthetic offline merge verification data only.",
+  };
+}
+
 async function jsonFetch(url, options = {}) {
   const response = await fetch(url, options);
   const body = await response.json().catch(() => ({}));
@@ -157,7 +187,42 @@ async function runSmokeTest() {
       "Sync smoke GET returned unexpected entry data.",
     );
 
-    console.log("Local sync smoke test passed with 1 safe entry at revision 1.");
+    const offlineUserId = `${USER_ID}-offline`;
+    const clientA = safeEntry("safe-offline-client-a", SAFE_OFFLINE_A_TITLE, "2026-06-02T00:00:00.000Z");
+    const clientB = safeEntry("safe-offline-client-b", SAFE_OFFLINE_B_TITLE, "2026-06-02T00:01:00.000Z");
+
+    const offlinePutA = await jsonFetch(`${baseUrl}/v1/media-log`, {
+      body: JSON.stringify({
+        userId: offlineUserId,
+        clientId: "sync-smoke-offline-client-a",
+        data: offlineSnapshot(clientA),
+      }),
+      headers,
+      method: "PUT",
+    });
+    assert(offlinePutA.response.ok, `Offline client A PUT failed with ${offlinePutA.response.status}.`);
+
+    const offlinePutB = await jsonFetch(`${baseUrl}/v1/media-log`, {
+      body: JSON.stringify({
+        userId: offlineUserId,
+        clientId: "sync-smoke-offline-client-b",
+        data: offlineSnapshot(clientB),
+      }),
+      headers,
+      method: "PUT",
+    });
+    assert(offlinePutB.response.ok, `Offline client B PUT failed with ${offlinePutB.response.status}.`);
+    assert(offlinePutB.body.record?.revision === 2, "Offline merge did not create revision 2.");
+
+    const offlineEntries = offlinePutB.body.record?.data?.currentWeek?.entries || [];
+    const offlineTitles = offlineEntries.map((entry) => entry.title).sort();
+    assert(offlineEntries.length === 2, "Offline merge should preserve both client entries.");
+    assert(
+      offlineTitles.join("|") === [SAFE_OFFLINE_A_TITLE, SAFE_OFFLINE_B_TITLE].sort().join("|"),
+      "Offline merge returned unexpected entry titles.",
+    );
+
+    console.log("Local sync smoke test passed with safe single-entry and offline merge checks.");
   } finally {
     await stopServer(server);
     await rm(tempDir, { force: true, recursive: true });

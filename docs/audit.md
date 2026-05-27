@@ -125,6 +125,6 @@ The repo now has two sync paths:
 
 The production path uses Supabase Auth, a row owned by the signed-in user, row-level security, and a server-side merge before write.
 
-`bun run verify` now runs safe migration, Stripe webhook, and local sync smoke tests. The migration test checks count-only reports. The sync smoke test starts the local sync server on a temporary port, writes one synthetic entry, reads it back, and deletes the temporary file.
+`bun run verify` now runs safe migration, Stripe webhook, and local sync smoke tests. The migration test checks count-only reports. The sync smoke test starts the local sync server on a temporary port, writes one synthetic entry, then simulates two offline clients and verifies their snapshots merge instead of overwriting each other. It deletes the temporary file at the end.
 
 Production sync is gated by a `$2` PostgreSQL entitlement row in `media_log_sync_entitlements`. Stripe Checkout creates the payment session, and a Stripe webhook activates the entitlement after payment.

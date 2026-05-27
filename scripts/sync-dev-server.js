@@ -49,12 +49,114 @@ function emptyRecord(userId) {
       currentWeek: null,
       history: [],
       addDraft: null,
+      tombstones: {},
     },
   };
 }
 
 function getUserId(url, body) {
   return body?.userId || url.searchParams.get("userId") || "personal";
+}
+
+function timestampValue(value) {
+  const parsed = Date.parse(typeof value === "string" ? value : "");
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function newestTimestamp(a, b) {
+  return timestampValue(a) >= timestampValue(b) ? a : b || a;
+}
+
+function weekKey(week) {
+  return `${week.year}-W${String(week.weekNumber).padStart(2, "0")}`;
+}
+
+function normalizeSnapshot(snapshot = {}) {
+  return {
+    currentWeek: snapshot.currentWeek || null,
+    history: Array.isArray(snapshot.history) ? snapshot.history : [],
+    addDraft: snapshot.addDraft || null,
+    tombstones: snapshot.tombstones || {},
+  };
+}
+
+function mergeTombstones(localTombstones = {}, remoteTombstones = {}) {
+  const tombstones = { ...remoteTombstones };
+  for (const [entryId, deletedAt] of Object.entries(localTombstones)) {
+    tombstones[entryId] = newestTimestamp(deletedAt, tombstones[entryId]);
+  }
+  return tombstones;
+}
+
+function mergeDraft(localDraft, remoteDraft) {
+  if (!localDraft) return remoteDraft || null;
+  if (!remoteDraft) return localDraft;
+  return timestampValue(localDraft.updatedAt) >= timestampValue(remoteDraft.updatedAt) ? localDraft : remoteDraft;
+}
+
+function addWeekToMap(map, week) {
+  if (!week) return;
+  const key = weekKey(week);
+  const existing = map.get(key);
+  if (!existing) {
+    map.set(key, { ...week, entries: [...(week.entries || [])] });
+    return;
+  }
+
+  existing.weekStart = existing.weekStart || week.weekStart;
+  existing.weekEnd = existing.weekEnd || week.weekEnd;
+  existing.entries.push(...(week.entries || []));
+}
+
+function mergeEntries(entries, tombstones) {
+  const byId = new Map();
+  for (const entry of entries) {
+    const existing = byId.get(entry.id);
+    if (!existing || timestampValue(entry.updatedAt) >= timestampValue(existing.updatedAt)) {
+      byId.set(entry.id, entry);
+    }
+  }
+
+  return [...byId.values()]
+    .filter((entry) => {
+      const deletedAt = tombstones[entry.id];
+      return !deletedAt || timestampValue(deletedAt) < timestampValue(entry.updatedAt);
+    })
+    .sort((left, right) => timestampValue(left.createdAt) - timestampValue(right.createdAt));
+}
+
+function mergeSnapshots(localSnapshot, remoteSnapshot) {
+  const local = normalizeSnapshot(localSnapshot);
+  const remote = normalizeSnapshot(remoteSnapshot);
+  const tombstones = mergeTombstones(local.tombstones, remote.tombstones);
+  const weeks = new Map();
+
+  addWeekToMap(weeks, remote.currentWeek);
+  for (const week of remote.history) addWeekToMap(weeks, week);
+  addWeekToMap(weeks, local.currentWeek);
+  for (const week of local.history) addWeekToMap(weeks, week);
+
+  for (const week of weeks.values()) {
+    week.entries = mergeEntries(week.entries || [], tombstones);
+  }
+
+  const currentKey = local.currentWeek
+    ? weekKey(local.currentWeek)
+    : remote.currentWeek
+      ? weekKey(remote.currentWeek)
+      : null;
+  const currentWeek = currentKey ? weeks.get(currentKey) || null : null;
+  const history = [...weeks.entries()]
+    .filter(([key]) => key !== currentKey)
+    .map(([, week]) => week)
+    .sort((a, b) => b.year - a.year || b.weekNumber - a.weekNumber);
+
+  return {
+    currentWeek,
+    history,
+    addDraft: mergeDraft(local.addDraft, remote.addDraft),
+    tombstones,
+  };
 }
 
 Bun.serve({
@@ -97,7 +199,7 @@ Bun.serve({
         revision: nextRevision,
         updatedAt: new Date().toISOString(),
         clientId: body.clientId || null,
-        data: body.data,
+        data: mergeSnapshots(body.data, previous.data),
       };
 
       store.users[userId] = record;
