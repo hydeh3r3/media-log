@@ -60,6 +60,13 @@ type SupabaseRecordRow = {
   data?: unknown;
 };
 
+type SyncEntitlementRow = {
+  status?: string | null;
+  expires_at?: string | null;
+  price_cents?: number | string | null;
+  currency?: string | null;
+};
+
 class HttpResponseError extends Error {
   status: number;
 
@@ -342,6 +349,33 @@ async function readRecord(env: Env, userId: string): Promise<SyncRecord> {
   };
 }
 
+function hasActiveSyncEntitlement(row: SyncEntitlementRow | null): boolean {
+  if (!row || row.status !== "active") {
+    return false;
+  }
+
+  const priceCents = Number(row.price_cents || 0);
+  if (priceCents !== 200 || row.currency !== "usd") {
+    return false;
+  }
+
+  return !row.expires_at || timestampValue(row.expires_at) > Date.now();
+}
+
+async function readSyncEntitlement(env: Env, userId: string): Promise<SyncEntitlementRow | null> {
+  const path = `/rest/v1/media_log_sync_entitlements?user_id=eq.${encodeURIComponent(userId)}&select=status,expires_at,price_cents,currency&limit=1`;
+  const response = await supabaseFetch(env, path);
+  const rows = await response.json() as SyncEntitlementRow[];
+  return rows[0] || null;
+}
+
+async function assertSyncEntitlement(env: Env, userId: string): Promise<void> {
+  const entitlement = await readSyncEntitlement(env, userId);
+  if (!hasActiveSyncEntitlement(entitlement)) {
+    throw httpError(402, "Cross-device sync requires the $2 sync unlock.");
+  }
+}
+
 async function writeRecord(env: Env, userId: string, previousRecord: SyncRecord, body: PushBody): Promise<SyncRecord> {
   const incomingSnapshot = sanitizeSnapshot(body.data);
   const mergedSnapshot = mergeSnapshots(incomingSnapshot, previousRecord.data);
@@ -389,6 +423,7 @@ async function handleRequest(request: Request): Promise<Response> {
 
   const env = readEnv();
   const user = await readUser(env, request.headers.get("authorization"));
+  await assertSyncEntitlement(env, user.id);
   const previousRecord = await readRecord(env, user.id);
 
   if (request.method === "GET") {

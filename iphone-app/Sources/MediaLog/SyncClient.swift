@@ -74,7 +74,8 @@ struct SyncClient {
     private func validate(response: URLResponse, data: Data) throws {
         guard let http = response as? HTTPURLResponse else { return }
         guard (200..<300).contains(http.statusCode) else {
-            let message = String(data: data, encoding: .utf8) ?? "HTTP \(http.statusCode)"
+            let envelope = try? JSONDecoder().decode(SyncEnvelope.self, from: data)
+            let message = envelope?.error ?? String(data: data, encoding: .utf8) ?? "HTTP \(http.statusCode)"
             throw SyncError.remote(message)
         }
     }

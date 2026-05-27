@@ -95,7 +95,7 @@ textarea {
   resize: vertical;
 }
 
-button[type="submit"], .week-actions button, .history-summary-actions button {
+button[type="submit"], .week-actions button, .history-summary-actions button, .sync-actions button, .migration-actions button, .auth-actions button {
   width: 100%;
   padding: 10px;
   margin-top: 4px;
@@ -109,7 +109,7 @@ button[type="submit"], .week-actions button, .history-summary-actions button {
   transition: background 0.15s;
 }
 
-button[type="submit"]:hover, .week-actions button:hover, .history-summary-actions button:hover {
+button[type="submit"]:hover, .week-actions button:hover, .history-summary-actions button:hover, .sync-actions button:hover, .migration-actions button:hover, .auth-actions button:hover {
   background: #C96442;
 }
 
@@ -120,17 +120,17 @@ button[type="submit"]:hover, .week-actions button:hover, .history-summary-action
   margin-top: 12px;
 }
 
-.week-actions #btn-publish-week {
+.week-actions #btn-export-week {
   grid-column: 1 / -1;
 }
 
-.secondary-action {
+button.secondary-action {
   background: transparent;
   color: #8B8478;
   border: 1px solid #D4CBC0;
 }
 
-.secondary-action:hover {
+button.secondary-action:hover {
   background: #EDE5DA;
   color: #5A544C;
 }
@@ -153,14 +153,6 @@ button[type="submit"]:hover, .week-actions button:hover, .history-summary-action
   color: #6B645C;
   font-size: 12px;
   line-height: 1.4;
-}
-
-.publish-panel {
-  margin-top: 12px;
-}
-
-.publish-panel[hidden] {
-  display: none !important;
 }
 
 /* Week entries list */
@@ -370,4 +362,30 @@ button[type="submit"]:hover, .week-actions button:hover, .history-summary-action
   color: #8B8478;
   padding: 24px 0;
   font-size: 12px;
+}
+
+.sync-actions {
+  margin-top: 12px;
+}
+
+.migration-actions {
+  margin-top: 8px;
+}
+
+.auth-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.sync-summary {
+  margin-top: 12px;
+  padding: 10px 12px;
+  background: #fff;
+  border: 1px solid #D4CBC0;
+  border-radius: 6px;
+  color: #6B645C;
+  font-size: 12px;
+  line-height: 1.5;
 }

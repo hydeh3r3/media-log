@@ -14,7 +14,7 @@ Both clients use the same sync shape. They can sync through Supabase in producti
 - Edit and delete archived entries in the iOS app.
 - Keep weekly history.
 - Save drafts in the Chrome extension.
-- Sync current week, history, drafts, tombstones, and entry metadata.
+- Sync current week, history, drafts, tombstones, and entry metadata after the `$2` sync unlock is active.
 - Sign up, sign in, sign out, and request password reset emails through Supabase.
 
 ## Repo Map
@@ -25,7 +25,7 @@ Both clients use the same sync shape. They can sync through Supabase in producti
 - `scripts/`: build, lint, local sync, and verification scripts.
 - `shared/`: sync protocol notes.
 - `docs/`: audit, privacy, store, and backend setup notes.
-- `firefox-extension/`: Firefox and Zen local-use copy.
+- `firefox-extension/`: Firefox and Zen local-use copy with the same sync flow.
 
 ## Verify Everything
 
@@ -35,7 +35,7 @@ Run:
 bun run verify
 ```
 
-This checks the Chrome source, lints the Chrome release manifest, builds the Chrome release zip, checks the Supabase backend files, runs a local sync smoke test, and builds the iOS app for the simulator.
+This checks the Chrome source, lints the Chrome release manifest, builds the Chrome release zip, checks the Firefox and Zen source, checks the Supabase backend files, runs a local sync smoke test, and builds the iOS app for the simulator.
 
 ## Chrome Development
 
@@ -100,6 +100,8 @@ The local sync file is written under `.local-sync/`, which is ignored by git.
 ## Production Sync
 
 Production sync uses Supabase.
+
+Cross-device sync is gated by a `$2` entitlement row in PostgreSQL. Details live in [docs/paid-sync.md](docs/paid-sync.md).
 
 Deploy:
 

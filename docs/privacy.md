@@ -23,3 +23,5 @@ Production sync signs in through Supabase Auth. The clients can also request sig
 The iOS app stores the session in Keychain. The local media log JSON file should not contain sync credentials.
 
 The Chrome extension stores the session in extension storage. The Supabase service key belongs only in Supabase function secrets.
+
+Paid sync uses a PostgreSQL entitlement row. The repo stores sync status and payment provider references, not card data.

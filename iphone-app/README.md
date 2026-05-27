@@ -52,6 +52,8 @@ Deploy the Supabase backend from the repo root:
 
 Setup steps are in `docs/supabase-sync.md`.
 
+Cross-device sync requires the `$2` sync unlock. The unlock is stored in PostgreSQL by the Supabase backend.
+
 Use these settings in the app:
 
 - Mode: `Supabase`
@@ -67,3 +69,5 @@ After sign-in, tap `Sync Now`.
 Use `Reset Password` to send a Supabase password reset email. Supabase must have an Auth redirect URL set before the reset link can finish the password change.
 
 Do not paste a service key into the app. The password is used only for sign-in and is not saved.
+
+If sync says `Cross-device sync requires the $2 sync unlock.`, activate the user's sync entitlement in Supabase.

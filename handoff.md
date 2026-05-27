@@ -7,6 +7,7 @@ It no longer depends on the old website publish bridge. The Chrome release path,
 ## Current Product Shape
 
 - `chrome-extension/` is the Chrome Web Store target.
+- `firefox-extension/` is the Firefox and Zen local-use copy.
 - `iphone-app/` is the SwiftUI iOS companion app.
 - `supabase/` is the production sync backend.
 - `scripts/sync-dev-server.js` is the local sync backend.
@@ -63,6 +64,8 @@ The production backend is Supabase:
 - `supabase/migrations/20260526173000_create_media_log_records.sql`
 - `supabase/functions/media-log-sync/index.ts`
 
+Production sync is gated by a `$2` PostgreSQL entitlement row in `media_log_sync_entitlements`.
+
 The local backend is:
 
 - `scripts/sync-dev-server.js`
@@ -73,7 +76,7 @@ The one-command verification path runs a safe sync smoke test:
 bun run verify
 ```
 
-That check writes one synthetic entry to a temporary local server and reads it back. It does not use private log data.
+That command also checks the Firefox and Zen source. The sync smoke test writes one synthetic entry to a temporary local server and reads it back. It does not use private log data.
 
 ## Storage Shape
 

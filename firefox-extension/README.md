@@ -2,11 +2,13 @@
 
 This folder is the Firefox and Zen version of the Media Log extension.
 
-It has the same popup, storage, active tab prefill, weekly history, JSON export, and publish bridge flow as the Chrome extension.
+It has the same popup, storage, active tab prefill, weekly history, JSON export, migration prep, and sync flow as the Chrome extension.
 
 It uses Firefox WebExtension APIs, so load this folder in Firefox or Zen, not Chrome.
 
-The extension stores entries in the browser. When you click `Publish to Website`, it sends the saved URLs, titles, and notes to your local bridge server only.
+The extension stores entries in the browser. When sync is enabled, it sends data to the sync endpoint you choose.
+
+Firefox's manifest declares authentication info, browsing activity, and website content because saved entries can include account sign-in data, URLs, page titles, and notes you choose to sync.
 
 ## Load in Zen
 
@@ -18,12 +20,43 @@ The extension stores entries in the browser. When you click `Publish to Website`
 
 Temporary add-ons stay loaded until Zen restarts. After a restart, repeat the same load step.
 
-## Publish to the Website
+## Dev Sync
 
-Before using `Publish to Website`, run the bridge from the website repo:
+Run the local sync server from the repo root:
 
-`cd /Users/wetbrain/Documents/workspace/alituncgenc.com`
+`bun run sync:dev`
 
-`bun run publish:bridge`
+Use these settings in the Sync tab:
 
-The extension sends the week to `http://127.0.0.1:43187/publish`, then falls back to `http://localhost:43187/publish`.
+- Mode: `Local dev`
+- Endpoint: `http://127.0.0.1:43189`
+- User ID: `personal`
+- Token: `dev-media-log-token`
+
+The dev server writes to `.local-sync/`, which is ignored.
+
+## Production Sync
+
+Deploy the Supabase backend in `supabase/`.
+
+Setup steps are in `docs/supabase-sync.md`.
+
+Cross-device sync requires the `$2` sync unlock. The unlock is stored in PostgreSQL by the Supabase backend.
+
+Use these settings in the Sync tab:
+
+- Mode: `Supabase`
+- Supabase URL: `https://<project-ref>.supabase.co`
+- Publishable key: your Supabase publishable key
+- Email: your Supabase account email
+- Password: your Supabase account password
+
+Click `Sign Up` if you need a new account. If Supabase asks you to confirm your email, confirm it and then click `Sign In`.
+
+After sign-in, click `Sync Now`.
+
+Use `Reset Password` to send a Supabase password reset email. Supabase must have an Auth redirect URL set before the reset link can finish the password change.
+
+Do not use a service key in the extension. The password is used only for sign-in and is not saved.
+
+If sync says `Cross-device sync requires the $2 sync unlock.`, activate the user's sync entitlement in Supabase.

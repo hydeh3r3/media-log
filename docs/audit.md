@@ -14,6 +14,8 @@ The repo has four main areas:
 
 The Chrome extension is the main product target. The Firefox folder is useful for Zen, but it is not the official store target for this goal.
 
+The Firefox and Zen copy now follows the same sync-capable popup shape as Chrome. It uses Firefox `browser.*` APIs, keeps the local-use Gecko ID, and no longer ships the old website publish bridge permissions.
+
 ## Current Chrome Extension
 
 The Chrome extension is a single popup app.
@@ -33,6 +35,7 @@ Current storage keys:
 - `history`
 - `addDraft`
 - `syncConfig`
+- `syncSession`
 - `syncState`
 - `syncTombstones`
 
@@ -122,3 +125,5 @@ The repo now has two sync paths:
 The production path uses Supabase Auth, a row owned by the signed-in user, row-level security, and a server-side merge before write.
 
 `bun run verify` now runs a safe local sync smoke test. It starts the local sync server on a temporary port, writes one synthetic entry, reads it back, and deletes the temporary file.
+
+Production sync is gated by a `$2` PostgreSQL entitlement row in `media_log_sync_entitlements`.
