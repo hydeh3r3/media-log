@@ -108,6 +108,12 @@ Deploy with:
 bun run supabase:deploy
 ```
 
+Check the local webhook rules with safe fake events:
+
+```sh
+bun run check:stripe
+```
+
 ## Manual Unlock
 
 Example manual unlock:

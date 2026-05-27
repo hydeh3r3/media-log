@@ -4,9 +4,11 @@ const REQUIRED_FILES = [
   "supabase/config.toml",
   "supabase/migrations/20260526173000_create_media_log_records.sql",
   "supabase/migrations/20260527031500_create_media_log_sync_entitlements.sql",
+  "supabase/functions/_shared/stripe-webhook.ts",
   "supabase/functions/media-log-sync/index.ts",
   "supabase/functions/media-log-checkout/index.ts",
   "supabase/functions/media-log-stripe-webhook/index.ts",
+  "scripts/stripe-webhook-smoke-test.js",
 ];
 
 function assert(condition, message) {
@@ -17,6 +19,16 @@ function assert(condition, message) {
 
 async function read(path) {
   return readFile(new URL(`../${path}`, import.meta.url), "utf8");
+}
+
+async function assertBuilds(path, label) {
+  const result = await Bun.build({
+    entrypoints: [new URL(`../${path}`, import.meta.url).pathname],
+    write: false,
+    target: "bun",
+  });
+
+  assert(result.success, `${label} must build: ${result.logs.map((log) => log.message).join("; ")}`);
 }
 
 for (const path of REQUIRED_FILES) {
@@ -51,12 +63,11 @@ const transpiledFunction = new Bun.Transpiler({ loader: "ts" }).transformSync(fu
 new Function(transpiledFunction);
 
 const checkoutSource = await read("supabase/functions/media-log-checkout/index.ts");
-const transpiledCheckoutFunction = new Bun.Transpiler({ loader: "ts" }).transformSync(checkoutSource);
-new Function(transpiledCheckoutFunction);
-
+await assertBuilds("supabase/functions/media-log-checkout/index.ts", "Checkout function");
 const webhookSource = await read("supabase/functions/media-log-stripe-webhook/index.ts");
-const transpiledWebhookFunction = new Bun.Transpiler({ loader: "ts" }).transformSync(webhookSource);
-new Function(transpiledWebhookFunction);
+const webhookLogicSource = await read("supabase/functions/_shared/stripe-webhook.ts");
+const webhookCombinedSource = `${webhookSource}\n${webhookLogicSource}`;
+await assertBuilds("supabase/functions/media-log-stripe-webhook/index.ts", "Stripe webhook function");
 
 assert(functionSource.includes("/auth/v1/user"), "Function must validate the bearer token with Supabase Auth.");
 assert(functionSource.includes("SUPABASE_SECRET_KEYS"), "Function must read server-only Supabase secret keys.");
@@ -76,15 +87,15 @@ assert(checkoutSource.includes("client_reference_id"), "Checkout function must a
 assert(checkoutSource.includes("metadata[media_log_user_id]"), "Checkout function must add Media Log user metadata.");
 assert(!/sk_(test|live)_[A-Za-z0-9]+/.test(checkoutSource), "Checkout function must not contain a Stripe secret key.");
 
-assert(webhookSource.includes("Stripe-Signature"), "Webhook function must verify Stripe signatures.");
-assert(webhookSource.includes("SHA-256"), "Webhook function must use HMAC SHA-256 signature checks.");
-assert(webhookSource.includes("checkout.session.completed"), "Webhook function must handle completed Checkout Sessions.");
+assert(webhookCombinedSource.includes("Stripe-Signature"), "Webhook function must verify Stripe signatures.");
+assert(webhookCombinedSource.includes("SHA-256"), "Webhook function must use HMAC SHA-256 signature checks.");
+assert(webhookCombinedSource.includes("checkout.session.completed"), "Webhook function must handle completed Checkout Sessions.");
 assert(
-  webhookSource.includes("checkout.session.async_payment_succeeded"),
+  webhookCombinedSource.includes("checkout.session.async_payment_succeeded"),
   "Webhook function must handle delayed payment success.",
 );
 assert(webhookSource.includes("media_log_sync_entitlements"), "Webhook function must write sync entitlements.");
 assert(webhookSource.includes("price_cents") && webhookSource.includes("200"), "Webhook entitlement price must be $2.");
-assert(!/whsec_[A-Za-z0-9]+/.test(webhookSource), "Webhook function must not contain a Stripe webhook secret.");
+assert(!/whsec_[A-Za-z0-9]+/.test(webhookCombinedSource), "Webhook function must not contain a Stripe webhook secret.");
 
 console.log("Supabase backend checks passed.");

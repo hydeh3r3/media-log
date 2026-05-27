@@ -35,7 +35,7 @@ Run:
 bun run verify
 ```
 
-This checks the Chrome source, lints the Chrome release manifest, builds the Chrome release zip, checks the Firefox and Zen source, checks the Supabase backend files, runs a local sync smoke test, and builds the iOS app for the simulator.
+This checks the Chrome source, lints the Chrome release manifest, builds the Chrome release zip, checks the Firefox and Zen source, checks the Supabase backend files, runs a Stripe webhook smoke test, runs a local sync smoke test, and builds the iOS app for the simulator.
 
 ## Chrome Development
 
