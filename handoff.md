@@ -78,6 +78,8 @@ bun run verify
 
 That command also checks the Firefox and Zen source. The migration smoke test runs Chrome and Firefox with synthetic private-looking data and checks that reports stay count-only. The sync smoke test writes one synthetic entry to a temporary local server, then simulates two offline clients and verifies both entries survive the merge. The Stripe webhook smoke test signs fake events and checks that only a paid `$2` USD checkout unlocks sync. These tests do not use private log data.
 
+The install handoff is checked too. It must keep the Chrome, Firefox or Zen, iOS, Supabase, Stripe, paid sync, PostgreSQL, and migration steps documented.
+
 ## Storage Shape
 
 The synced snapshot contains:
@@ -116,6 +118,7 @@ These steps need user accounts, private browser data, or store access:
 
 - [README.md](README.md)
 - [docs/audit.md](docs/audit.md)
+- [docs/install-test.md](docs/install-test.md)
 - [docs/supabase-sync.md](docs/supabase-sync.md)
 - [docs/chrome-web-store.md](docs/chrome-web-store.md)
 - [docs/privacy.md](docs/privacy.md)
