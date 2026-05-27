@@ -67,26 +67,24 @@ final class MediaLogStore {
     }
 
     func add(_ entry: MediaEntry) {
-        ensureCurrentWeek()
-        snapshot.currentWeek?.entries.append(entry)
-        snapshot.currentWeek?.entries.sortByCreatedAt()
-        markDirty("entry-added")
+        saveEntry(entry)
     }
 
     func update(_ entry: MediaEntry) {
-        ensureCurrentWeek()
-        guard let currentWeek = snapshot.currentWeek else { return }
+        saveEntry(entry)
+    }
 
-        if let index = currentWeek.entries.firstIndex(where: { $0.id == entry.id }) {
-            snapshot.currentWeek?.entries[index] = entry
-            snapshot.currentWeek?.entries.sortByCreatedAt()
-            markDirty("entry-edited")
-        }
+    func saveEntry(_ entry: MediaEntry) {
+        ensureCurrentWeek()
+        let existed = removeEntry(id: entry.id)
+        snapshot.tombstones.removeValue(forKey: entry.id)
+        placeEntry(entry)
+        markDirty(existed ? "entry-edited" : "entry-added")
     }
 
     func delete(_ entry: MediaEntry) {
         ensureCurrentWeek()
-        snapshot.currentWeek?.entries.removeAll { $0.id == entry.id }
+        guard removeEntry(id: entry.id) else { return }
         snapshot.tombstones[entry.id] = ISO8601DateFormatter.mediaLog.string(from: Date())
         markDirty("entry-deleted")
     }
@@ -243,6 +241,68 @@ final class MediaLogStore {
         }
         snapshot.currentWeek = current
         markDirty("week-rollover")
+    }
+
+    private func placeEntry(_ entry: MediaEntry) {
+        let targetWeek = week(for: entry.date)
+
+        if snapshot.currentWeek?.id == targetWeek.id {
+            snapshot.currentWeek?.entries.append(entry)
+            snapshot.currentWeek?.entries.sortByCreatedAt()
+            return
+        }
+
+        if let historyIndex = snapshot.history.firstIndex(where: { $0.id == targetWeek.id }) {
+            snapshot.history[historyIndex].entries.append(entry)
+            snapshot.history[historyIndex].entries.sortByCreatedAt()
+        } else {
+            var week = targetWeek
+            week.entries = [entry]
+            snapshot.history.append(week)
+        }
+        sortHistory()
+    }
+
+    private func removeEntry(id: String) -> Bool {
+        var removed = false
+
+        if let entryIndex = snapshot.currentWeek?.entries.firstIndex(where: { $0.id == id }) {
+            snapshot.currentWeek?.entries.remove(at: entryIndex)
+            removed = true
+        }
+
+        for historyIndex in snapshot.history.indices.reversed() {
+            guard let entryIndex = snapshot.history[historyIndex].entries.firstIndex(where: { $0.id == id }) else {
+                continue
+            }
+
+            snapshot.history[historyIndex].entries.remove(at: entryIndex)
+            removed = true
+
+            if snapshot.history[historyIndex].entries.isEmpty {
+                snapshot.history.remove(at: historyIndex)
+            }
+        }
+
+        return removed
+    }
+
+    private func week(for dateString: String) -> MediaWeek {
+        let date = DateFormatter.mediaLogDay.date(from: dateString) ?? Date()
+        let info = ISOWeekInfo(date: date)
+        return MediaWeek(
+            weekStart: DateFormatter.mediaLogDay.string(from: info.start),
+            weekEnd: DateFormatter.mediaLogDay.string(from: info.end),
+            weekNumber: info.week,
+            year: info.year,
+            entries: []
+        )
+    }
+
+    private func sortHistory() {
+        snapshot.history.sort { left, right in
+            left.year == right.year ? left.weekNumber > right.weekNumber : left.year > right.year
+        }
     }
 
     private func markDirty(_ reason: String) {

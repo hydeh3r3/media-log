@@ -69,11 +69,7 @@ struct EntryEditorView: View {
         entry.title = entry.title.trimmingCharacters(in: .whitespacesAndNewlines)
         entry.updatedAt = ISO8601DateFormatter.mediaLog.string(from: Date())
 
-        if store.currentEntries.contains(where: { $0.id == entry.id }) {
-            store.update(entry)
-        } else {
-            store.add(entry)
-        }
+        store.saveEntry(entry)
         dismiss()
     }
 }

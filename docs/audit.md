@@ -102,6 +102,7 @@ Manual store work still remains:
 The iOS folder now contains an Xcode project with a SwiftUI app. It has:
 
 - list, add, edit, and delete entry views
+- editable archived history
 - local persistence
 - sync settings
 - cloud sync with the same data model as Chrome

@@ -12,7 +12,7 @@ struct ContentView: View {
             .tabItem { Label("Week", systemImage: "calendar") }
 
             NavigationStack {
-                HistoryView(store: store)
+                HistoryView(store: store, editorEntry: $editorEntry)
             }
             .tabItem { Label("History", systemImage: "clock") }
 
@@ -78,6 +78,7 @@ struct WeekView: View {
 
 struct HistoryView: View {
     @Bindable var store: MediaLogStore
+    @Binding var editorEntry: MediaEntry?
 
     var body: some View {
         List {
@@ -85,6 +86,15 @@ struct HistoryView: View {
                 Section("Week \(week.weekNumber), \(week.year)") {
                     ForEach(week.entries) { entry in
                         EntryRow(entry: entry)
+                            .contentShape(Rectangle())
+                            .onTapGesture {
+                                editorEntry = entry
+                            }
+                    }
+                    .onDelete { offsets in
+                        for index in offsets {
+                            store.delete(week.entries[index])
+                        }
                     }
                 }
             }

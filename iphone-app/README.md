@@ -7,6 +7,7 @@ It can:
 - show this week's entries
 - add, edit, and delete entries
 - show archived weeks
+- edit and delete archived entries
 - save data on device
 - sync with the same JSON endpoint as the Chrome extension
 
