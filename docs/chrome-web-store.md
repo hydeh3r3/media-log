@@ -24,9 +24,39 @@ Before upload, prepare:
 
 - 128x128 icon
 - screenshots of Add, This Week, History, and Sync
+- small promotional image
 - a short description
 - a full description
 - privacy answers for the Chrome Web Store form
+
+## Store Image Assets
+
+Build the local store image assets with:
+
+`bun run build:chrome-store-assets`
+
+The command writes:
+
+- `store-assets/chrome/screenshots/01-add-entry.png`
+- `store-assets/chrome/screenshots/02-this-week.png`
+- `store-assets/chrome/screenshots/03-history.png`
+- `store-assets/chrome/screenshots/04-sync.png`
+- `store-assets/chrome/promo-small.png`
+
+The screenshots are `1280x800`.
+
+The small promotional image is `440x280`.
+
+These are safe demo images. They do not contain private media log data.
+
+The asset script uses local Chrome in headless mode. If Chrome is in a custom location, set `CHROME_BIN` before running the command.
+
+The size choices follow the Chrome Web Store image guide:
+
+- screenshots: `1280x800` or `640x400`
+- small promotional image: `440x280`
+
+Reference: [Chrome Web Store image guide](https://developer.chrome.com/docs/webstore/images/).
 
 ## Short Description
 

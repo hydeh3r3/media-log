@@ -40,10 +40,23 @@ The zip is written to `dist/`.
 
 The package check only allows extension files in the zip. It blocks local sync files, browser storage exports, Supabase code, scripts, and secret-looking values.
 
+Build the Chrome Web Store image assets:
+
+```sh
+bun run build:chrome-store-assets
+```
+
+The generated screenshots and small promotional image live in `store-assets/chrome/`.
+
+The screenshots are `1280x800`.
+
+The small promotional image is `440x280`.
+
 Manual Chrome Web Store work still remains:
 
 - upload the zip
 - add screenshots
+- add the small promotional image
 - answer the privacy form
 - review the store listing text in `docs/chrome-web-store.md`
 
