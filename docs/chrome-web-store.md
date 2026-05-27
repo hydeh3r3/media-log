@@ -29,6 +29,8 @@ Before upload, prepare:
 - a full description
 - privacy answers for the Chrome Web Store form
 
+Privacy form answers live in [chrome-web-store-privacy.md](chrome-web-store-privacy.md).
+
 ## Store Image Assets
 
 Build the local store image assets with:
@@ -71,6 +73,20 @@ Use it to save articles, manga, anime, films, TV shows, music, games, books, and
 Your data stays in browser storage unless you set up sync. Production sync uses Supabase Auth, row-level security, and the `media-log-sync` Edge Function. Local dev sync uses the endpoint and token you choose.
 
 Cross-device sync is a paid `$2` unlock. Stripe handles checkout and card storage. Media Log stores only the sync entitlement status and Stripe references in PostgreSQL.
+
+## Privacy Practices
+
+Use [chrome-web-store-privacy.md](chrome-web-store-privacy.md) to fill the Chrome Web Store privacy form.
+
+Prepared answers cover:
+
+- single purpose
+- permission justifications
+- remote code answer
+- data type disclosures
+- limited-use certification
+- privacy policy URL
+- in-app purchase disclosure
 
 ## Permission Notes
 

@@ -111,7 +111,7 @@ These steps need user accounts, private browser data, or store access:
 - set Supabase Auth redirect URLs
 - run the real Chrome storage migration
 - upload the Chrome release zip to the Chrome Web Store
-- fill the Chrome Web Store privacy form
+- fill the Chrome Web Store privacy form with `docs/chrome-web-store-privacy.md`
 - set the Apple developer team in Xcode before device install
 
 ## Useful Docs
@@ -121,4 +121,5 @@ These steps need user accounts, private browser data, or store access:
 - [docs/install-test.md](docs/install-test.md)
 - [docs/supabase-sync.md](docs/supabase-sync.md)
 - [docs/chrome-web-store.md](docs/chrome-web-store.md)
+- [docs/chrome-web-store-privacy.md](docs/chrome-web-store-privacy.md)
 - [docs/privacy.md](docs/privacy.md)

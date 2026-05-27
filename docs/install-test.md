@@ -57,7 +57,7 @@ Manual Chrome Web Store work still remains:
 - upload the zip
 - add screenshots
 - add the small promotional image
-- answer the privacy form
+- answer the privacy form with `docs/chrome-web-store-privacy.md`
 - review the store listing text in `docs/chrome-web-store.md`
 
 ## Firefox And Zen Install
@@ -200,5 +200,5 @@ These steps still need live accounts, private browser data, or store access:
 - run the real browser-data migration from your installed extension
 - pay through Stripe Checkout or add your manual entitlement row
 - upload the Chrome release zip to the Chrome Web Store
-- answer the Chrome Web Store privacy form
+- answer the Chrome Web Store privacy form with `docs/chrome-web-store-privacy.md`
 - set the Apple developer team before installing on a real iPhone

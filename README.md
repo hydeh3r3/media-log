@@ -146,6 +146,6 @@ These steps need live accounts or private data:
 - set Stripe checkout and webhook secrets in Supabase
 - set Supabase Auth redirect URLs
 - upload the Chrome release zip to the Chrome Web Store
-- answer the Chrome Web Store privacy form
+- answer the Chrome Web Store privacy form with `docs/chrome-web-store-privacy.md`
 - run the real browser-data migration from your installed extension
 - set the Apple developer team before device install

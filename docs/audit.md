@@ -89,7 +89,8 @@ The extension now has:
 - tighter permissions
 - a privacy note
 - store listing copy
-- screenshot guidance
+- screenshot and small promotional image assets
+- Chrome Web Store privacy form answers
 - a repeatable release package command
 - release zip content verification
 - no local website bridge code in the release package
@@ -97,8 +98,7 @@ The extension now has:
 
 Manual store work still remains:
 
-- create final screenshots
-- answer the Chrome Web Store privacy form
+- answer the Chrome Web Store privacy form with `docs/chrome-web-store-privacy.md`
 - upload the release zip
 
 ## iOS App
