@@ -24,7 +24,7 @@ for (const field of ["name", "version", "description", "action", "icons"]) {
 
 const permissions = manifest.permissions || [];
 for (const permission of permissions) {
-  if (!["storage", "activeTab"].includes(permission)) {
+  if (!["storage", "activeTab", "scripting"].includes(permission)) {
     errors.push(`Unexpected required permission: ${permission}`);
   }
 }

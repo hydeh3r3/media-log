@@ -155,7 +155,148 @@ function includesAny(value, needles) {
   return needles.some((needle) => value.includes(needle));
 }
 
-function inferTypeFromTab(tab) {
+// Runs inside the inspected page (serialized via browser.scripting). Keep it
+// self-contained: it may only reference page globals, never popup.js scope.
+function collectPageSignals() {
+  const result = {
+    ogType: "",
+    twitterCard: "",
+    siteName: "",
+    ldTypes: [],
+    metaPrefixes: [],
+    bodyTextLength: 0,
+  };
+
+  const getMeta = (selector) => {
+    const el = document.querySelector(selector);
+    return el ? (el.getAttribute("content") || "").trim() : "";
+  };
+
+  result.ogType = getMeta('meta[property="og:type"]').toLowerCase();
+  result.twitterCard = getMeta('meta[name="twitter:card"]').toLowerCase();
+  result.siteName = getMeta('meta[property="og:site_name"]').toLowerCase();
+
+  // Prefixed OG meta groups (article:, book:, music:, video:) signal a category.
+  const prefixes = new Set();
+  for (const meta of document.querySelectorAll("meta[property]")) {
+    const prop = (meta.getAttribute("property") || "").toLowerCase();
+    const colon = prop.indexOf(":");
+    if (colon > 0) prefixes.add(prop.slice(0, colon));
+  }
+  result.metaPrefixes = [...prefixes];
+
+  // JSON-LD structured data: collect every schema.org @type on the page.
+  const types = new Set();
+  const pushType = (value) => {
+    if (Array.isArray(value)) {
+      for (const v of value) pushType(v);
+    } else if (typeof value === "string") {
+      types.add(value.toLowerCase());
+    }
+  };
+  const walk = (node) => {
+    if (!node || typeof node !== "object") return;
+    if (Array.isArray(node)) {
+      for (const item of node) walk(item);
+      return;
+    }
+    if (node["@type"]) pushType(node["@type"]);
+    if (node["@graph"]) walk(node["@graph"]);
+  };
+  for (const script of document.querySelectorAll('script[type="application/ld+json"]')) {
+    try {
+      walk(JSON.parse(script.textContent));
+    } catch {
+      // Ignore malformed JSON-LD.
+    }
+  }
+  result.ldTypes = [...types];
+
+  // Long-form reading content hints toward an article.
+  const article = document.querySelector("article");
+  const text = article ? article.textContent : document.body?.innerText;
+  result.bodyTextLength = (text || "").trim().length;
+
+  return result;
+}
+
+// Extracts structured signals from the active tab. Requires the activeTab
+// grant (the popup opening counts as the user gesture). Returns null on
+// restricted pages (about:, addons, PDFs) so callers fall back to URL.
+async function extractPageSignals(tabId) {
+  if (typeof tabId !== "number" || !browser.scripting?.executeScript) {
+    return null;
+  }
+  try {
+    const [injection] = await browser.scripting.executeScript({
+      target: { tabId },
+      func: collectPageSignals,
+    });
+    return injection?.result || null;
+  } catch {
+    return null;
+  }
+}
+
+// Folds page metadata into the type scores. Structured declarations outrank
+// URL/title heuristics, so they carry higher weights.
+function scorePageSignals(scores, signals) {
+  if (!signals) return;
+
+  const ldTypeMap = {
+    movie: "film",
+    tvseries: "tv",
+    tvseason: "tv",
+    tvepisode: "tv",
+    book: "book",
+    audiobook: "book",
+    musicrecording: "music",
+    musicalbum: "music",
+    musicgroup: "music",
+    musicplaylist: "music",
+    videogame: "game",
+    podcastepisode: "podcast",
+    podcastseries: "podcast",
+    article: "article",
+    newsarticle: "article",
+    blogposting: "article",
+    scholarlyarticle: "article",
+    report: "article",
+    comicseries: "manga",
+    comicstory: "manga",
+  };
+  for (const ldType of signals.ldTypes || []) {
+    const mapped = ldTypeMap[ldType];
+    if (mapped) addTypeScore(scores, mapped, 14);
+  }
+
+  const ogTypeMap = {
+    "video.movie": "film",
+    "video.tv_show": "tv",
+    "video.episode": "tv",
+    "music.song": "music",
+    "music.album": "music",
+    "music.playlist": "music",
+    book: "book",
+    "books.book": "book",
+    article: "article",
+  };
+  const mappedOg = ogTypeMap[signals.ogType];
+  if (mappedOg) addTypeScore(scores, mappedOg, 12);
+
+  for (const prefix of signals.metaPrefixes || []) {
+    if (prefix === "article") addTypeScore(scores, "article", 6);
+    else if (prefix === "book") addTypeScore(scores, "book", 5);
+    else if (prefix === "music") addTypeScore(scores, "music", 5);
+  }
+
+  // Substantial body text nudges toward article when nothing else dominates.
+  if ((signals.bodyTextLength || 0) > 2500) {
+    addTypeScore(scores, "article", 3);
+  }
+}
+
+function inferTypeFromTab(tab, pageSignals = null) {
   const rawUrl = tab.url || "";
   const rawTitle = tab.title || "";
 
@@ -185,6 +326,7 @@ function inferTypeFromTab(tab) {
     host.includes("mangadex") ||
     host.includes("mangaplus") ||
     host.includes("mangafire") ||
+    host.includes("mangafreak.me") ||
     host.includes("manga4life") ||
     host.includes("manganato") ||
     host.includes("comick.") ||
@@ -217,6 +359,8 @@ function inferTypeFromTab(tab) {
     host.includes("crunchyroll.com") ||
     host.includes("animepahe.com") ||
     host.includes("animepahe.pw") ||
+    host.includes("anikoto.com") ||
+    host.includes("anikototv.to") ||
     host.includes("hidive.com") ||
     host.includes("funimation.com")
   ) {
@@ -301,6 +445,8 @@ function inferTypeFromTab(tab) {
     addTypeScore(scores, "article", 3);
   }
 
+  scorePageSignals(scores, pageSignals);
+
   const rankedTypes = Object.entries(scores).sort((a, b) => b[1] - a[1]);
   if (rankedTypes.length > 0 && rankedTypes[0][1] >= 5) {
     return rankedTypes[0][0];
@@ -311,7 +457,10 @@ function inferTypeFromTab(tab) {
       "mangadex",
       "mangaplus",
       "mangafire",
+      "mangafreak.me",
       "crunchyroll.com",
+      "anikoto.com",
+      "anikototv.to",
       "hidive.com",
       "youtube.com",
       "youtu.be",
@@ -1180,7 +1329,8 @@ async function prefillFromTab({ preserveDraftType = false } = {}) {
       }
 
       if (!preserveDraftType && (!typeInput.value || typeInput.value === DEFAULT_ENTRY_TYPE)) {
-        const inferredType = inferTypeFromTab(tab);
+        const pageSignals = await extractPageSignals(tab.id);
+        const inferredType = inferTypeFromTab(tab, pageSignals);
         if (inferredType && SELECTABLE_ENTRY_TYPES.has(inferredType)) {
           typeInput.value = inferredType;
         }
