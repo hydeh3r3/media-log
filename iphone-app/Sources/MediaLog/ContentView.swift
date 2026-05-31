@@ -78,21 +78,20 @@ struct WeekView: View {
                             }
                         }
                     } header: {
-                        Text(dayHeader(day.key))
-                            .font(.caption.weight(.bold))
-                            .textCase(.uppercase)
-                            .foregroundStyle(.white)
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 6)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .background(Color.medialogAccent)
-                            .clipShape(RoundedRectangle(cornerRadius: 6))
-                            .listRowInsets(EdgeInsets(top: 4, leading: 0, bottom: 4, trailing: 0))
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(dayHeader(day.key))
+                                .font(.caption.weight(.bold))
+                                .textCase(.uppercase)
+                                .foregroundStyle(Color.medialogAccent)
+                            Rectangle()
+                                .fill(Color.medialogAccent)
+                                .frame(height: 1)
+                        }
                     }
                 }
             }
         }
-        .listStyle(.insetGrouped)
+        .listStyle(.plain)
         .overlay {
             if store.currentEntries.isEmpty {
                 ContentUnavailableView("No entries yet", systemImage: "square.and.pencil")
