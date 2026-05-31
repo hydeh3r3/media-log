@@ -2,6 +2,7 @@ import SwiftUI
 
 struct EntryEditorView: View {
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.medialogTheme) private var theme
     @Bindable var store: MediaLogStore
     @State private var entry: MediaEntry
 
@@ -34,6 +35,8 @@ struct EntryEditorView: View {
                     ), axis: .vertical)
                 }
             }
+            .scrollContentBackground(.hidden)
+            .background(theme.bg)
             .navigationTitle(entry.title.isEmpty ? "New Entry" : "Edit Entry")
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {

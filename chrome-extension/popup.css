@@ -1,3 +1,84 @@
+/* ===== Theme palettes ===== */
+:root {
+  --bg: #F5EEE6;
+  --surface: #EDE5DA;
+  --card: #FFFFFF;
+  --border: #D4CBC0;
+  --text: #2D2B2A;
+  --muted: #8B8478;
+  --muted-strong: #6B645C;
+  --accent: #DA7756;
+  --accent-hover: #C96442;
+  --accent-contrast: #FFFFFF;
+  --accent-soft: rgba(218, 119, 86, 0.14);
+  --edit: #7C9A6E;
+  --danger: #CC4444;
+}
+
+[data-theme="catppuccin"] {
+  --bg: #1E1E2E;
+  --surface: #181825;
+  --card: #313244;
+  --border: #45475A;
+  --text: #CDD6F4;
+  --muted: #A6ADC8;
+  --muted-strong: #BAC2DE;
+  --accent: #CBA6F7;
+  --accent-hover: #F5C2E7;
+  --accent-contrast: #1E1E2E;
+  --accent-soft: rgba(203, 166, 247, 0.18);
+  --edit: #A6E3A1;
+  --danger: #F38BA8;
+}
+
+[data-theme="tokyo-night"] {
+  --bg: #1A1B26;
+  --surface: #16161E;
+  --card: #24283B;
+  --border: #414868;
+  --text: #C0CAF5;
+  --muted: #787C99;
+  --muted-strong: #A9B1D6;
+  --accent: #7AA2F7;
+  --accent-hover: #BB9AF7;
+  --accent-contrast: #1A1B26;
+  --accent-soft: rgba(122, 162, 247, 0.18);
+  --edit: #9ECE6A;
+  --danger: #F7768E;
+}
+
+[data-theme="dracula"] {
+  --bg: #282A36;
+  --surface: #21222C;
+  --card: #343746;
+  --border: #44475A;
+  --text: #F8F8F2;
+  --muted: #6272A4;
+  --muted-strong: #ABB2D0;
+  --accent: #BD93F9;
+  --accent-hover: #FF79C6;
+  --accent-contrast: #282A36;
+  --accent-soft: rgba(189, 147, 249, 0.18);
+  --edit: #50FA7B;
+  --danger: #FF5555;
+}
+
+[data-theme="nier"] {
+  --bg: #C9C3AA;
+  --surface: #BDB79C;
+  --card: #D6D1BB;
+  --border: #A39D83;
+  --text: #454138;
+  --muted: #736D5A;
+  --muted-strong: #565141;
+  --accent: #4E4B42;
+  --accent-hover: #2F2C25;
+  --accent-contrast: #D6D1BB;
+  --accent-soft: rgba(78, 75, 66, 0.14);
+  --edit: #6F7657;
+  --danger: #8A3B32;
+}
+
 * {
   box-sizing: border-box;
   margin: 0;
@@ -9,14 +90,14 @@ body {
   min-height: 200px;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   font-size: 13px;
-  color: #2D2B2A;
-  background: #F5EEE6;
+  color: var(--text);
+  background: var(--bg);
 }
 
 header {
   padding: 12px 16px 0;
-  background: #EDE5DA;
-  border-bottom: 1px solid #D4CBC0;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
 }
 
 .header-top {
@@ -26,10 +107,22 @@ header {
   margin-bottom: 4px;
 }
 
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.brand-logo {
+  width: 22px;
+  height: 22px;
+  flex-shrink: 0;
+}
+
 header h1 {
   font-size: 15px;
   font-weight: 600;
-  color: #DA7756;
+  color: var(--accent);
 }
 
 .settings-btn {
@@ -39,24 +132,24 @@ header h1 {
   padding: 4px;
   background: none;
   border: none;
-  color: #8B8478;
+  color: var(--muted);
   cursor: pointer;
   border-radius: 6px;
   transition: color 0.15s, background 0.15s;
 }
 
 .settings-btn:hover {
-  color: #DA7756;
-  background: rgba(218, 119, 86, 0.1);
+  color: var(--accent);
+  background: var(--accent-soft);
 }
 
 .settings-btn.active {
-  color: #DA7756;
+  color: var(--accent);
 }
 
 .greeting {
   font-size: 12px;
-  color: #6B645C;
+  color: var(--muted-strong);
   margin-bottom: 8px;
   line-height: 1.4;
 }
@@ -79,7 +172,7 @@ nav {
   background: none;
   border: none;
   border-bottom: 2px solid transparent;
-  color: #8B8478;
+  color: var(--muted);
   font-size: 12px;
   font-weight: 500;
   cursor: pointer;
@@ -87,12 +180,12 @@ nav {
 }
 
 .tab:hover {
-  color: #5A544C;
+  color: var(--muted-strong);
 }
 
 .tab.active {
-  color: #DA7756;
-  border-bottom-color: #DA7756;
+  color: var(--accent);
+  border-bottom-color: var(--accent);
 }
 
 .tab-content {
@@ -110,7 +203,7 @@ label {
   margin-bottom: 10px;
   font-size: 11px;
   font-weight: 500;
-  color: #8B8478;
+  color: var(--muted);
   text-transform: uppercase;
   letter-spacing: 0.5px;
 }
@@ -120,18 +213,18 @@ input, select, textarea {
   width: 100%;
   margin-top: 4px;
   padding: 8px 10px;
-  background: #fff;
-  border: 1px solid #D4CBC0;
+  background: var(--card);
+  border: 1px solid var(--border);
   border-radius: 6px;
-  color: #2D2B2A;
+  color: var(--text);
   font-size: 13px;
   font-family: inherit;
 }
 
 input:focus, select:focus, textarea:focus {
   outline: none;
-  border-color: #DA7756;
-  box-shadow: 0 0 0 2px rgba(218, 119, 86, 0.15);
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--accent-soft);
 }
 
 textarea {
@@ -142,10 +235,10 @@ button[type="submit"], .week-actions button, .history-summary-actions button, .s
   width: 100%;
   padding: 10px;
   margin-top: 4px;
-  background: #DA7756;
+  background: var(--accent);
   border: none;
   border-radius: 6px;
-  color: #fff;
+  color: var(--accent-contrast);
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
@@ -153,7 +246,7 @@ button[type="submit"], .week-actions button, .history-summary-actions button, .s
 }
 
 button[type="submit"]:hover, .week-actions button:hover, .history-summary-actions button:hover, .sync-actions button:hover, .migration-actions button:hover, .auth-actions button:hover {
-  background: #C96442;
+  background: var(--accent-hover);
 }
 
 .week-actions {
@@ -169,19 +262,19 @@ button[type="submit"]:hover, .week-actions button:hover, .history-summary-action
 
 button.secondary-action {
   background: transparent;
-  color: #8B8478;
-  border: 1px solid #D4CBC0;
+  color: var(--muted);
+  border: 1px solid var(--border);
 }
 
 button.secondary-action:hover {
-  background: #EDE5DA;
-  color: #5A544C;
+  background: var(--surface);
+  color: var(--muted-strong);
 }
 
 .status {
   margin-top: 8px;
   font-size: 12px;
-  color: #DA7756;
+  color: var(--accent);
   text-align: center;
   min-height: 18px;
 }
@@ -189,11 +282,11 @@ button.secondary-action:hover {
 .history-notice {
   margin-bottom: 10px;
   padding: 10px 12px;
-  background: #fff;
-  border: 1px solid #D4CBC0;
-  border-left: 3px solid #DA7756;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent);
   border-radius: 6px;
-  color: #6B645C;
+  color: var(--muted-strong);
   font-size: 12px;
   line-height: 1.4;
 }
@@ -202,7 +295,7 @@ button.secondary-action:hover {
 #week-header {
   font-size: 15px;
   font-weight: 600;
-  color: #2D2B2A;
+  color: var(--text);
   margin-bottom: 10px;
 }
 
@@ -217,8 +310,8 @@ button.secondary-action:hover {
 .day-separator {
   margin-bottom: 8px;
   padding-bottom: 6px;
-  border-bottom: 1px solid #DA7756;
-  color: #C96442;
+  border-bottom: 1px solid var(--accent);
+  color: var(--accent-hover);
   font-size: 11px;
   font-weight: 700;
   text-transform: uppercase;
@@ -230,7 +323,7 @@ button.secondary-action:hover {
 }
 
 .day-group-body .entry-item.editing {
-  border-left-color: #7C9A6E;
+  border-left-color: var(--edit);
 }
 
 .day-group-body .entry-item:last-child {
@@ -240,26 +333,26 @@ button.secondary-action:hover {
 .entry-item {
   padding: 8px 10px;
   margin-bottom: 6px;
-  background: #fff;
+  background: var(--card);
   border-radius: 6px;
-  border-left: 3px solid #DA7756;
+  border-left: 3px solid var(--accent);
 }
 
 .entry-item .entry-title {
   font-weight: 600;
-  color: #2D2B2A;
+  color: var(--text);
   font-size: 13px;
 }
 
 .entry-item .entry-meta {
   font-size: 11px;
-  color: #8B8478;
+  color: var(--muted);
   margin-top: 2px;
 }
 
 .entry-item .entry-note {
   font-size: 12px;
-  color: #6B645C;
+  color: var(--muted-strong);
   margin-top: 4px;
   font-style: italic;
 }
@@ -273,31 +366,31 @@ button.secondary-action:hover {
 .entry-item .entry-actions button {
   background: none;
   border: none;
-  color: #8B8478;
+  color: var(--muted);
   font-size: 11px;
   cursor: pointer;
   padding: 0;
 }
 
 .entry-item .entry-actions button:hover {
-  color: #DA7756;
+  color: var(--accent);
 }
 
 .entry-item .entry-actions .btn-delete:hover {
-  color: #c44;
+  color: var(--danger);
 }
 
 .entry-item.editing {
-  border-left-color: #7C9A6E;
+  border-left-color: var(--edit);
 }
 
 /* Edit form */
 .edit-form {
   padding: 12px;
   margin: 8px 0;
-  background: #fff;
+  background: var(--card);
   border-radius: 6px;
-  border: 1px solid #D4CBC0;
+  border: 1px solid var(--border);
 }
 
 .edit-form label {
@@ -321,29 +414,29 @@ button.secondary-action:hover {
 }
 
 .edit-actions button[type="submit"] {
-  background: #DA7756;
-  color: #fff;
+  background: var(--accent);
+  color: var(--accent-contrast);
 }
 
 .edit-actions button[type="submit"]:hover {
-  background: #C96442;
+  background: var(--accent-hover);
 }
 
 .edit-actions button[type="button"] {
   background: transparent;
-  color: #8B8478;
-  border: 1px solid #D4CBC0;
+  color: var(--muted);
+  border: 1px solid var(--border);
 }
 
 .edit-actions button[type="button"]:hover {
-  background: #EDE5DA;
+  background: var(--surface);
 }
 
 .history-week {
   margin-bottom: 8px;
-  background: #fff;
+  background: var(--card);
   border-radius: 6px;
-  border: 1px solid #D4CBC0;
+  border: 1px solid var(--border);
 }
 
 .history-week summary {
@@ -361,7 +454,7 @@ button.secondary-action:hover {
 }
 
 .history-summary-title {
-  color: #2D2B2A;
+  color: var(--text);
   font-size: 12px;
   font-weight: 600;
 }
@@ -377,18 +470,18 @@ button.secondary-action:hover {
   margin-top: 0;
   padding: 5px 8px;
   font-size: 11px;
-  color: #fff;
+  color: var(--accent-contrast);
 }
 
 .history-summary-actions .secondary-action {
-  background: #DA7756;
-  color: #fff;
+  background: var(--accent);
+  color: var(--accent-contrast);
   border: none;
 }
 
 .history-summary-actions .secondary-action:hover {
-  background: #C96442;
-  color: #fff;
+  background: var(--accent-hover);
+  color: var(--accent-contrast);
 }
 
 .history-entries {
@@ -398,7 +491,7 @@ button.secondary-action:hover {
 .history-week summary::before {
   content: "\25B6 ";
   font-size: 10px;
-  color: #8B8478;
+  color: var(--muted);
   margin-right: 6px;
 }
 
@@ -418,8 +511,8 @@ button.secondary-action:hover {
   width: 100%;
   padding: 8px 10px;
   background: transparent;
-  color: #8B8478;
-  border: 1px solid #D4CBC0;
+  color: var(--muted);
+  border: 1px solid var(--border);
   border-radius: 6px;
   font-size: 12px;
   font-weight: 600;
@@ -428,13 +521,13 @@ button.secondary-action:hover {
 }
 
 .history-export:hover {
-  background: #EDE5DA;
-  color: #5A544C;
+  background: var(--surface);
+  color: var(--muted-strong);
 }
 
 .empty {
   text-align: center;
-  color: #8B8478;
+  color: var(--muted);
   padding: 24px 0;
   font-size: 12px;
 }
@@ -457,10 +550,10 @@ button.secondary-action:hover {
 .sync-summary {
   margin-top: 12px;
   padding: 10px 12px;
-  background: #fff;
-  border: 1px solid #D4CBC0;
+  background: var(--card);
+  border: 1px solid var(--border);
   border-radius: 6px;
-  color: #6B645C;
+  color: var(--muted-strong);
   font-size: 12px;
   line-height: 1.5;
 }

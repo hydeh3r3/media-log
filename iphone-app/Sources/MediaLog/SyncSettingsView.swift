@@ -4,6 +4,8 @@ struct SyncSettingsView: View {
     @Environment(\.openURL) private var openURL
     @Bindable var store: MediaLogStore
     @AppStorage("medialog.userName") private var userName: String = ""
+    @AppStorage("medialog.theme") private var themeId: String = "monet"
+    @Environment(\.medialogTheme) private var theme
     @State private var mode: SyncMode = .supabase
     @State private var endpoint: String = ""
     @State private var userId: String = "personal"
@@ -18,6 +20,14 @@ struct SyncSettingsView: View {
             Section("Greeting") {
                 TextField("Your name", text: $userName)
                     .textInputAutocapitalization(.words)
+            }
+
+            Section("Appearance") {
+                Picker("Theme", selection: $themeId) {
+                    ForEach(Themes.all) { option in
+                        Text(option.name).tag(option.id)
+                    }
+                }
             }
 
             Section("Connection") {
@@ -113,6 +123,8 @@ struct SyncSettingsView: View {
                 .disabled(syncDisabled)
             }
         }
+        .scrollContentBackground(.hidden)
+        .background(theme.bg)
         .navigationTitle("Settings")
         .onAppear {
             mode = store.syncConfig.mode

@@ -1,3 +1,11 @@
+// Apply the saved theme synchronously before first paint to avoid a flash.
+// localStorage mirrors browser.storage (the source of truth) and is updated
+// on every theme change in initTheme().
+try {
+  const savedTheme = localStorage.getItem("theme");
+  if (savedTheme) document.documentElement.dataset.theme = savedTheme;
+} catch {}
+
 const ENTRY_TYPES = {
   manga: "Manga",
   anime: "Anime",
@@ -1135,7 +1143,7 @@ function getSyncConfigFromForm() {
 function showSyncStatus(message, isError = false) {
   const status = document.getElementById("sync-status");
   status.textContent = message;
-  status.style.color = isError ? "#C44" : "#DA7756";
+  status.style.color = isError ? "var(--danger)" : "var(--accent)";
 }
 
 function renderSyncSummary(data) {
@@ -1408,6 +1416,33 @@ function formatDayHeader(dateStr) {
   const date = new Date(`${dateStr}T12:00:00Z`);
   if (Number.isNaN(date.getTime())) return dateStr;
   return `${WEEKDAYS[date.getUTCDay()]} · ${date.getUTCDate()} ${MONTHS[date.getUTCMonth()].slice(0, 3)}`;
+}
+
+const THEMES = new Set(["monet", "catppuccin", "tokyo-night", "dracula", "nier"]);
+const DEFAULT_THEME = "monet";
+
+function applyTheme(theme) {
+  document.documentElement.dataset.theme = THEMES.has(theme) ? theme : DEFAULT_THEME;
+}
+
+async function initTheme() {
+  const { theme } = await browser.storage.local.get(["theme"]);
+  const value = THEMES.has(theme) ? theme : DEFAULT_THEME;
+  applyTheme(value);
+  try {
+    localStorage.setItem("theme", value);
+  } catch {}
+
+  const select = document.getElementById("theme-select");
+  if (!select) return;
+  select.value = value;
+  select.addEventListener("change", async () => {
+    applyTheme(select.value);
+    try {
+      localStorage.setItem("theme", select.value);
+    } catch {}
+    await browser.storage.local.set({ theme: select.value });
+  });
 }
 
 function renderGreeting(name) {
@@ -1881,6 +1916,7 @@ document.getElementById("btn-prepare-migration").addEventListener("click", async
 // --- Init ---
 
 async function init() {
+  await initTheme();
   await initUserName();
 
   const initialData = await ensureCurrentWeek();

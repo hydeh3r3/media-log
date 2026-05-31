@@ -7,7 +7,10 @@
 <body>
   <header>
     <div class="header-top">
-      <h1>Media Log</h1>
+      <div class="brand">
+        <img src="icons/logo.png" alt="" class="brand-logo">
+        <h1>Media Log</h1>
+      </div>
       <button type="button" id="btn-settings" class="settings-btn" title="Settings" aria-label="Settings">
         <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
           <circle cx="12" cy="12" r="3"></circle>
@@ -193,6 +196,16 @@
     <label class="name-field">
       Your name
       <input type="text" id="user-name" placeholder="optional — used in your greeting">
+    </label>
+    <label class="theme-field">
+      Theme
+      <select id="theme-select">
+        <option value="monet">Monet (default)</option>
+        <option value="catppuccin">Catppuccin</option>
+        <option value="tokyo-night">Tokyo Night</option>
+        <option value="dracula">Dracula</option>
+        <option value="nier">NieR: Automata</option>
+      </select>
     </label>
   </section>
 
