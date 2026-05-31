@@ -8,7 +8,7 @@ const ROOT = new URL("..", import.meta.url).pathname;
 const ASSET_DIR = join(ROOT, "store-assets", "chrome");
 const SCREENSHOT_DIR = join(ASSET_DIR, "screenshots");
 const STAGE_DIR = join(ROOT, "dist", "chrome-store-assets-stage");
-const ICON_PATH = join(ROOT, "chrome-extension", "icons", "icon128.png");
+const ICON_PATH = join(ROOT, "chrome-stable", "icons", "icon128.png");
 const CHROME_TIMEOUT_MS = 8_000;
 const CHROME_RENDER_POLL_MS = 250;
 

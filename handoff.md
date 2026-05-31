@@ -6,7 +6,7 @@ It no longer depends on the old website publish bridge. The Chrome release path,
 
 ## Current Product Shape
 
-- `chrome-extension/` is the Chrome Web Store target.
+- `chrome-stable/` is the Chrome Web Store target.
 - `firefox-extension/` is the Firefox and Zen local-use copy.
 - `iphone-app/` is the SwiftUI iOS companion app.
 - `supabase/` is the production sync backend.

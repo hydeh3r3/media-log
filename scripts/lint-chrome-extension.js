@@ -2,7 +2,7 @@ import { existsSync } from "node:fs";
 import { join } from "node:path";
 
 const ROOT = new URL("..", import.meta.url).pathname;
-const EXTENSION_DIR = join(ROOT, "chrome-extension");
+const EXTENSION_DIR = join(ROOT, "chrome-stable");
 const manifest = await Bun.file(join(EXTENSION_DIR, "manifest.json")).json();
 const errors = [];
 

@@ -17,7 +17,7 @@ Load this folder in Chrome:
 1. Open `chrome://extensions`.
 2. Turn on Developer mode.
 3. Click `Load unpacked`.
-4. Select `/Users/wetbrain/Documents/workspace/media-log/chrome-extension`.
+4. Select `/Users/wetbrain/Documents/workspace/media-log/chrome-stable`.
 
 ## Dev Sync
 

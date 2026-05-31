@@ -19,7 +19,7 @@ Both clients use the same sync shape. They can sync through Supabase in producti
 
 ## Repo Map
 
-- `chrome-extension/`: Chrome Web Store extension source.
+- `chrome-stable/`: Chrome Web Store extension source.
 - `iphone-app/`: SwiftUI iOS app and Xcode project.
 - `supabase/`: production database migration and Edge Function.
 - `scripts/`: build, lint, local sync, and verification scripts.
@@ -44,7 +44,7 @@ Install and test steps live in [docs/install-test.md](docs/install-test.md).
 Load the extension from:
 
 ```text
-/Users/wetbrain/Documents/workspace/media-log/chrome-extension
+/Users/wetbrain/Documents/workspace/media-log/chrome-stable
 ```
 
 Steps:

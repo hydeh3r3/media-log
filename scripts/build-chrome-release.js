@@ -3,7 +3,7 @@ import { mkdir, rm } from "node:fs/promises";
 import { basename, dirname, join } from "node:path";
 
 const ROOT = new URL("..", import.meta.url).pathname;
-const SOURCE_DIR = join(ROOT, "chrome-extension");
+const SOURCE_DIR = join(ROOT, "chrome-stable");
 const DIST_DIR = join(ROOT, "dist");
 const STAGE_DIR = join(DIST_DIR, "chrome-release");
 const MANIFEST_PATH = join(SOURCE_DIR, "manifest.json");

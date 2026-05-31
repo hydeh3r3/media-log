@@ -15,7 +15,7 @@ That command checks the Chrome package, Firefox source and lint, Supabase backen
 Load this folder:
 
 ```text
-/Users/wetbrain/Documents/workspace/media-log/chrome-extension
+/Users/wetbrain/Documents/workspace/media-log/chrome-stable
 ```
 
 Steps:

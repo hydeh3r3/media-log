@@ -6,7 +6,7 @@ Date: 2026-05-26
 
 The repo has four main areas:
 
-- `chrome-extension`: the Chrome Manifest V3 popup.
+- `chrome-stable`: the Chrome Manifest V3 popup.
 - `firefox-extension`: the Firefox and Zen copy of the popup.
 - `shared`: sync protocol notes.
 - `iphone-app`: the SwiftUI companion app package.

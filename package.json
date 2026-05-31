@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "check:chrome": "node --check chrome-extension/popup.js",
+    "check:chrome": "node --check chrome-stable/popup.js",
     "check:firefox": "node --check firefox-extension/popup.js",
     "check:ios": "xcodebuild -project iphone-app/MediaLog.xcodeproj -scheme MediaLog -destination 'generic/platform=iOS Simulator' build",
     "check:ios-release": "node --check scripts/check-ios-release.js && bun run scripts/check-ios-release.js && xcodebuild -project iphone-app/MediaLog.xcodeproj -scheme MediaLog -configuration Release -destination 'generic/platform=iOS Simulator' build",

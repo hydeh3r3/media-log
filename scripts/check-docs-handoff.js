@@ -11,7 +11,7 @@ const REQUIRED_FILES = [
   "docs/chrome-web-store.md",
   "docs/chrome-web-store-privacy.md",
   "docs/privacy.md",
-  "chrome-extension/README.md",
+  "chrome-stable/README.md",
   "firefox-extension/README.md",
   "iphone-app/README.md",
 ];
@@ -19,7 +19,7 @@ const REQUIRED_FILES = [
 const INSTALL_GUIDE_REQUIREMENTS = [
   ["full verification command", "bun run verify"],
   ["Chrome dev install URL", "chrome://extensions"],
-  ["Chrome extension folder", "/Users/wetbrain/Documents/workspace/media-log/chrome-extension"],
+  ["Chrome extension folder", "/Users/wetbrain/Documents/workspace/media-log/chrome-stable"],
   ["Chrome package command", "bun run package:chrome"],
   ["Chrome package output", "dist/"],
   ["Chrome store asset command", "bun run build:chrome-store-assets"],

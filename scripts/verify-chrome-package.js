@@ -3,7 +3,7 @@ import { join } from "node:path";
 
 const ROOT = new URL("..", import.meta.url).pathname;
 const DIST_DIR = join(ROOT, "dist");
-const manifest = await Bun.file(join(ROOT, "chrome-extension", "manifest.json")).json();
+const manifest = await Bun.file(join(ROOT, "chrome-stable", "manifest.json")).json();
 const zipPath = join(DIST_DIR, `media-log-chrome-${manifest.version}.zip`);
 const expectedEntries = [
   "icons/icon128.png",
