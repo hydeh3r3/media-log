@@ -21,6 +21,7 @@ const SUPABASE_SYNC_PATH = "/functions/v1/media-log-sync";
 const SUPABASE_CHECKOUT_PATH = "/functions/v1/media-log-checkout";
 const TOKEN_REFRESH_MARGIN_MS = 60_000;
 
+const WEEKDAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 const MONTHS = [
   "January",
   "February",
@@ -92,6 +93,8 @@ function switchTab(tabName) {
   for (const content of document.querySelectorAll(".tab-content")) {
     content.classList.toggle("active", content.id === `tab-${tabName}`);
   }
+  const settingsBtn = document.getElementById("btn-settings");
+  if (settingsBtn) settingsBtn.classList.toggle("active", tabName === "settings");
 }
 
 function normalizeCreatedAt(data) {
@@ -1308,6 +1311,8 @@ for (const btn of document.querySelectorAll(".tab")) {
   });
 }
 
+document.getElementById("btn-settings").addEventListener("click", () => switchTab("settings"));
+
 let rolloverArchivedWeek = null;
 
 // --- Add Entry ---
@@ -1399,6 +1404,34 @@ document.getElementById("entry-form").addEventListener("submit", async (e) => {
 
 // --- This Week ---
 
+function formatDayHeader(dateStr) {
+  const date = new Date(`${dateStr}T12:00:00Z`);
+  if (Number.isNaN(date.getTime())) return dateStr;
+  return `${WEEKDAYS[date.getUTCDay()]} · ${date.getUTCDate()} ${MONTHS[date.getUTCMonth()].slice(0, 3)}`;
+}
+
+function renderGreeting(name) {
+  const el = document.getElementById("greeting");
+  if (!el) return;
+  const trimmed = (name || "").trim();
+  el.textContent = trimmed
+    ? `Hey, ${trimmed} time to log what you enjoyed this week!`
+    : "Hey, time to log what you enjoyed this week!";
+}
+
+async function initUserName() {
+  const { userName } = await browser.storage.local.get(["userName"]);
+  renderGreeting(userName);
+
+  const input = document.getElementById("user-name");
+  if (!input) return;
+  input.value = userName || "";
+  input.addEventListener("input", async () => {
+    renderGreeting(input.value);
+    await browser.storage.local.set({ userName: input.value });
+  });
+}
+
 async function renderWeek() {
   const data = await ensureCurrentWeek();
   const cw = data.currentWeek;
@@ -1413,44 +1446,65 @@ async function renderWeek() {
   }
 
   container.replaceChildren();
-  cw.entries.forEach((entry, index) => {
-    const item = createEntryItem(entry);
-    item.dataset.index = String(index);
-    item.appendChild(createTextElement("div", "entry-meta", getEntryMeta(entry, true)));
 
-    if (entry.note) {
-      item.appendChild(createTextElement("div", "entry-note", entry.note));
+  // Group entries by day so each weekday gets its own separator. Original
+  // indices are preserved for the edit/delete handlers.
+  const groups = new Map();
+  cw.entries.forEach((entry, index) => {
+    if (!groups.has(entry.date)) groups.set(entry.date, []);
+    groups.get(entry.date).push({ entry, index });
+  });
+
+  for (const date of [...groups.keys()].sort()) {
+    const dayGroup = document.createElement("div");
+    dayGroup.className = "day-group";
+    dayGroup.appendChild(createTextElement("div", "day-separator", formatDayHeader(date)));
+
+    const dayBody = document.createElement("div");
+    dayBody.className = "day-group-body";
+
+    for (const { entry, index } of groups.get(date)) {
+      const item = createEntryItem(entry);
+      item.dataset.index = String(index);
+      item.appendChild(createTextElement("div", "entry-meta", getEntryMeta(entry)));
+
+      if (entry.note) {
+        item.appendChild(createTextElement("div", "entry-note", entry.note));
+      }
+
+      const actions = document.createElement("div");
+      actions.className = "entry-actions";
+
+      const editButton = document.createElement("button");
+      editButton.type = "button";
+      editButton.className = "btn-edit";
+      editButton.dataset.index = String(index);
+      editButton.textContent = "edit";
+      editButton.addEventListener("click", (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        startEdit(index);
+      });
+
+      const deleteButton = document.createElement("button");
+      deleteButton.type = "button";
+      deleteButton.className = "btn-delete";
+      deleteButton.dataset.index = String(index);
+      deleteButton.textContent = "delete";
+      deleteButton.addEventListener("click", async (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        await deleteEntry(index);
+      });
+
+      actions.append(editButton, deleteButton);
+      item.appendChild(actions);
+      dayBody.appendChild(item);
     }
 
-    const actions = document.createElement("div");
-    actions.className = "entry-actions";
-
-    const editButton = document.createElement("button");
-    editButton.type = "button";
-    editButton.className = "btn-edit";
-    editButton.dataset.index = String(index);
-    editButton.textContent = "edit";
-    editButton.addEventListener("click", (event) => {
-      event.preventDefault();
-      event.stopPropagation();
-      startEdit(index);
-    });
-
-    const deleteButton = document.createElement("button");
-    deleteButton.type = "button";
-    deleteButton.className = "btn-delete";
-    deleteButton.dataset.index = String(index);
-    deleteButton.textContent = "delete";
-    deleteButton.addEventListener("click", async (event) => {
-      event.preventDefault();
-      event.stopPropagation();
-      await deleteEntry(index);
-    });
-
-    actions.append(editButton, deleteButton);
-    item.appendChild(actions);
-    container.appendChild(item);
-  });
+    dayGroup.appendChild(dayBody);
+    container.appendChild(dayGroup);
+  }
 }
 
 // --- Edit / Delete ---
@@ -1827,6 +1881,8 @@ document.getElementById("btn-prepare-migration").addEventListener("click", async
 // --- Init ---
 
 async function init() {
+  await initUserName();
+
   const initialData = await ensureCurrentWeek();
   rolloverArchivedWeek = initialData.archivedWeek;
 

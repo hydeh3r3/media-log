@@ -34,6 +34,15 @@ extension DateFormatter {
         formatter.dateFormat = "yyyy-MM-dd"
         return formatter
     }()
+
+    // Weekday + short date for the "This Week" day separators, e.g. "Monday · 2 Jun".
+    static let mediaLogDayHeader: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = TimeZone(secondsFromGMT: 0)
+        formatter.dateFormat = "EEEE · d MMM"
+        return formatter
+    }()
 }
 
 extension ISO8601DateFormatter {
