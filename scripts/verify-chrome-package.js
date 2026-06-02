@@ -67,7 +67,7 @@ function assertManifestIsReleaseReady(packagedManifest) {
 
   const permissions = packagedManifest.permissions || [];
   for (const permission of permissions) {
-    if (!["storage", "activeTab"].includes(permission)) {
+    if (!["storage", "activeTab", "scripting"].includes(permission)) {
       fail(`Packaged manifest has unexpected required permission: ${permission}`);
     }
   }

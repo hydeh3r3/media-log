@@ -18,6 +18,10 @@ Media Log uses browser storage to save entries, drafts, history, sync settings, 
 
 Media Log uses the active tab only when the popup is opened. It reads the current tab title and URL so the user can save the page as a media entry.
 
+### `scripting`
+
+Media Log injects a small script into the active tab only when the user opens the popup, to read page metadata (title, URL, and structured page signals) so it can prefill a new media entry. The script runs only on the current tab at the user's request. It does not run in the background or on other tabs.
+
 ### Optional Host Access
 
 Media Log asks for host access only when the user turns on sync.
