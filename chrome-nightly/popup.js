@@ -1068,14 +1068,31 @@ async function renderHistory() {
   container.innerHTML = history
     .map((w, index) => {
       const { start, end } = getWeekBounds(w.year, w.weekNumber);
-      const entriesHtml = w.entries
-        .map((e) => {
-          let meta = ENTRY_TYPES[e.type] || e.type;
-          if (e.rating) meta += ` — ${e.rating}/10`;
-          return `<div class="entry-item">
+
+      // Group archived entries by day so each weekday gets its own separator,
+      // matching the This Week tab.
+      const dayGroups = new Map();
+      for (const e of w.entries) {
+        if (!dayGroups.has(e.date)) dayGroups.set(e.date, []);
+        dayGroups.get(e.date).push(e);
+      }
+
+      const entriesHtml = [...dayGroups.keys()]
+        .sort()
+        .map((date) => {
+          const dayHeader = `<div class="day-separator">${escapeHtml(formatDayHeader(date))}</div>`;
+          const rows = dayGroups
+            .get(date)
+            .map((e) => {
+              let meta = ENTRY_TYPES[e.type] || e.type;
+              if (e.rating) meta += ` — ${e.rating}/10`;
+              return `<div class="entry-item">
             <div class="entry-title">${escapeHtml(e.title)}</div>
             <div class="entry-meta">${escapeHtml(meta)}</div>
           </div>`;
+            })
+            .join("");
+          return `<div class="day-group">${dayHeader}<div class="day-group-body">${rows}</div></div>`;
         })
         .join("");
 

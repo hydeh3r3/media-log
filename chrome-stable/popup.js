@@ -1767,10 +1767,31 @@ async function renderHistory() {
 
     const entries = document.createElement("div");
     entries.className = "history-entries";
+
+    // Group archived entries by day so each weekday gets its own separator,
+    // matching the This Week tab.
+    const dayGroups = new Map();
     for (const entry of weekData.entries) {
-      const item = createEntryItem(entry);
-      item.appendChild(createTextElement("div", "entry-meta", getEntryMeta(entry)));
-      entries.appendChild(item);
+      if (!dayGroups.has(entry.date)) dayGroups.set(entry.date, []);
+      dayGroups.get(entry.date).push(entry);
+    }
+
+    for (const date of [...dayGroups.keys()].sort()) {
+      const dayGroup = document.createElement("div");
+      dayGroup.className = "day-group";
+      dayGroup.appendChild(createTextElement("div", "day-separator", formatDayHeader(date)));
+
+      const dayBody = document.createElement("div");
+      dayBody.className = "day-group-body";
+
+      for (const entry of dayGroups.get(date)) {
+        const item = createEntryItem(entry);
+        item.appendChild(createTextElement("div", "entry-meta", getEntryMeta(entry)));
+        dayBody.appendChild(item);
+      }
+
+      dayGroup.appendChild(dayBody);
+      entries.appendChild(dayGroup);
     }
 
     details.append(summary, entries);

@@ -121,17 +121,6 @@ struct WeekView: View {
             : "Hey, \(trimmed) time to log what you enjoyed this week!"
     }
 
-    // Entries grouped by day, ordered Monday → Sunday (ascending date).
-    private func groupedDays(_ week: MediaWeek) -> [(key: String, entries: [MediaEntry])] {
-        let groups = Dictionary(grouping: week.entries, by: { $0.date })
-        return groups.keys.sorted().map { (key: $0, entries: groups[$0] ?? []) }
-    }
-
-    private func dayHeader(_ dateString: String) -> String {
-        guard let date = DateFormatter.mediaLogDay.date(from: dateString) else { return dateString }
-        return DateFormatter.mediaLogDayHeader.string(from: date)
-    }
-
     var body: some View {
         List {
             Section {
@@ -158,15 +147,7 @@ struct WeekView: View {
                         }
                         .listRowBackground(Color.clear)
                     } header: {
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text(dayHeader(day.key))
-                                .font(.caption.weight(.bold))
-                                .textCase(.uppercase)
-                                .foregroundStyle(theme.accent)
-                            Rectangle()
-                                .fill(theme.accent)
-                                .frame(height: 1)
-                        }
+                        DaySeparator(text: dayHeader(day.key))
                     }
                 }
             }
@@ -198,6 +179,35 @@ struct WeekView: View {
     }
 }
 
+// Entries grouped by day, ordered Monday → Sunday (ascending date).
+func groupedDays(_ week: MediaWeek) -> [(key: String, entries: [MediaEntry])] {
+    let groups = Dictionary(grouping: week.entries, by: { $0.date })
+    return groups.keys.sorted().map { (key: $0, entries: groups[$0] ?? []) }
+}
+
+func dayHeader(_ dateString: String) -> String {
+    guard let date = DateFormatter.mediaLogDay.date(from: dateString) else { return dateString }
+    return DateFormatter.mediaLogDayHeader.string(from: date)
+}
+
+// Accent day-label with an underline rule, shared by This Week and History.
+struct DaySeparator: View {
+    @Environment(\.medialogTheme) private var theme
+    let text: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(text)
+                .font(.caption.weight(.bold))
+                .textCase(.uppercase)
+                .foregroundStyle(theme.accent)
+            Rectangle()
+                .fill(theme.accent)
+                .frame(height: 1)
+        }
+    }
+}
+
 struct HistoryView: View {
     @Bindable var store: MediaLogStore
     @Binding var editorEntry: MediaEntry?
@@ -207,19 +217,23 @@ struct HistoryView: View {
         List {
             ForEach(store.snapshot.history) { week in
                 Section("Week \(week.weekNumber), \(week.year)") {
-                    ForEach(week.entries) { entry in
-                        EntryRow(entry: entry)
-                            .contentShape(Rectangle())
-                            .onTapGesture {
-                                editorEntry = entry
+                    ForEach(groupedDays(week), id: \.key) { day in
+                        DaySeparator(text: dayHeader(day.key))
+                            .listRowBackground(Color.clear)
+                        ForEach(day.entries) { entry in
+                            EntryRow(entry: entry, showDate: false)
+                                .contentShape(Rectangle())
+                                .onTapGesture {
+                                    editorEntry = entry
+                                }
+                                .listRowBackground(theme.card)
+                        }
+                        .onDelete { offsets in
+                            for index in offsets {
+                                store.delete(day.entries[index])
                             }
-                    }
-                    .onDelete { offsets in
-                        for index in offsets {
-                            store.delete(week.entries[index])
                         }
                     }
-                    .listRowBackground(theme.card)
                 }
             }
         }
