@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Media Log",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Save and sync a weekly log of what you read, watch, play, and hear.",
   "permissions": ["storage", "activeTab", "scripting"],
   "optional_host_permissions": [
