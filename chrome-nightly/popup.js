@@ -20,6 +20,13 @@ const ENTRY_TYPES = {
 };
 const SELECTABLE_ENTRY_TYPES = new Set(["anime", "article", "book", "film", "game", "manga", "music", "podcast", "tv"]);
 const DEFAULT_ENTRY_TYPE = "article";
+const BACKUP_FORMAT = "media-log-backup";
+const BACKUP_VERSION = 1;
+const MAX_BACKUP_BYTES = 10 * 1024 * 1024;
+const MAX_HISTORY_WEEKS = 1_000;
+const MAX_ENTRIES_PER_WEEK = 10_000;
+const TRANSFER_PAGE_PATH = "popup.html?transfer=1";
+const isTransferPage = new URLSearchParams(globalThis.location?.search || "").get("transfer") === "1";
 
 const WEEKDAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 const MONTHS = [
@@ -184,6 +191,10 @@ async function getStorage() {
 
 async function setStorage(data) {
   return chrome.storage.local.set(data);
+}
+
+async function getPortableStorage() {
+  return chrome.storage.local.get(["currentWeek", "history", "addDraft", "userName", "theme"]);
 }
 
 function getPublishElements(scope) {
@@ -808,6 +819,26 @@ document.getElementById("entry-form").addEventListener("submit", async (e) => {
 
 // --- This Week ---
 
+function createTextElement(tagName, className, text) {
+  const element = document.createElement(tagName);
+  element.className = className;
+  element.textContent = text;
+  return element;
+}
+
+function getEntryMeta(entry) {
+  let meta = ENTRY_TYPES[entry.type] || entry.type;
+  if (entry.rating) meta += ` — ${entry.rating}/10`;
+  return meta;
+}
+
+function createEntryItem(entry) {
+  const item = document.createElement("div");
+  item.className = "entry-item";
+  item.appendChild(createTextElement("div", "entry-title", entry.title));
+  return item;
+}
+
 async function renderWeek() {
   const data = await ensureCurrentWeek();
   const cw = data.currentWeek;
@@ -817,59 +848,69 @@ async function renderWeek() {
 
   const container = document.getElementById("week-entries");
   if (cw.entries.length === 0) {
-    container.innerHTML = '<div class="empty">No entries yet.</div>';
+    container.replaceChildren(createTextElement("div", "empty", "No entries yet."));
     return;
   }
 
+  container.replaceChildren();
+
   // Group entries by day so each weekday gets its own separator. Original
-  // indices are preserved for the edit/delete handlers below.
+  // indices are preserved for the edit/delete handlers.
   const groups = new Map();
-  cw.entries.forEach((e, i) => {
-    if (!groups.has(e.date)) groups.set(e.date, []);
-    groups.get(e.date).push({ e, i });
+  cw.entries.forEach((entry, index) => {
+    if (!groups.has(entry.date)) groups.set(entry.date, []);
+    groups.get(entry.date).push({ entry, index });
   });
 
-  container.innerHTML = [...groups.keys()]
-    .sort()
-    .map((date) => {
-      const header = `<div class="day-separator">${escapeHtml(formatDayHeader(date))}</div>`;
-      const rows = groups
-        .get(date)
-        .map(({ e, i }) => {
-          let meta = ENTRY_TYPES[e.type] || e.type;
-          if (e.rating) meta += ` — ${e.rating}/10`;
-          const noteHtml = e.note ? `<div class="entry-note">${escapeHtml(e.note)}</div>` : "";
-          return `<div class="entry-item" data-index="${i}">
-        <div class="entry-title">${escapeHtml(e.title)}</div>
-        <div class="entry-meta">${escapeHtml(meta)}</div>
-        ${noteHtml}
-        <div class="entry-actions">
-          <button type="button" class="btn-edit" data-index="${i}">edit</button>
-          <button type="button" class="btn-delete" data-index="${i}">delete</button>
-        </div>
-      </div>`;
-        })
-        .join("");
-      return `<div class="day-group">${header}<div class="day-group-body">${rows}</div></div>`;
-    })
-    .join("");
+  for (const date of [...groups.keys()].sort()) {
+    const dayGroup = document.createElement("div");
+    dayGroup.className = "day-group";
+    dayGroup.appendChild(createTextElement("div", "day-separator", formatDayHeader(date)));
 
-  // Bind edit buttons
-  for (const btn of container.querySelectorAll(".btn-edit")) {
-    btn.addEventListener("click", (event) => {
-      event.preventDefault();
-      event.stopPropagation();
-      startEdit(Number.parseInt(btn.dataset.index, 10));
-    });
-  }
+    const dayBody = document.createElement("div");
+    dayBody.className = "day-group-body";
 
-  // Bind delete buttons
-  for (const btn of container.querySelectorAll(".btn-delete")) {
-    btn.addEventListener("click", async (event) => {
-      event.preventDefault();
-      event.stopPropagation();
-      await deleteEntry(Number.parseInt(btn.dataset.index, 10));
-    });
+    for (const { entry, index } of groups.get(date)) {
+      const item = createEntryItem(entry);
+      item.dataset.index = String(index);
+      item.appendChild(createTextElement("div", "entry-meta", getEntryMeta(entry)));
+
+      if (entry.note) {
+        item.appendChild(createTextElement("div", "entry-note", entry.note));
+      }
+
+      const actions = document.createElement("div");
+      actions.className = "entry-actions";
+
+      const editButton = document.createElement("button");
+      editButton.type = "button";
+      editButton.className = "btn-edit";
+      editButton.dataset.index = String(index);
+      editButton.textContent = "edit";
+      editButton.addEventListener("click", (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        startEdit(index);
+      });
+
+      const deleteButton = document.createElement("button");
+      deleteButton.type = "button";
+      deleteButton.className = "btn-delete";
+      deleteButton.dataset.index = String(index);
+      deleteButton.textContent = "delete";
+      deleteButton.addEventListener("click", async (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        await deleteEntry(index);
+      });
+
+      actions.append(editButton, deleteButton);
+      item.appendChild(actions);
+      dayBody.appendChild(item);
+    }
+
+    dayGroup.appendChild(dayBody);
+    container.appendChild(dayGroup);
   }
 }
 
@@ -1043,81 +1084,92 @@ document.getElementById("btn-new-week").addEventListener("click", async () => {
 
 // --- History ---
 
+function parseHistorySearch(query) {
+  return (query || "").toLowerCase().split(/\s+/).filter(Boolean);
+}
+
+// Every token must appear somewhere in the title, note, URL, or type label.
+function entryMatchesSearch(entry, tokens) {
+  const haystack = [entry.title, entry.note, entry.url, ENTRY_TYPES[entry.type] || entry.type]
+    .filter(Boolean)
+    .join("\n")
+    .toLowerCase();
+  return tokens.every((token) => haystack.includes(token));
+}
+
 async function renderHistory() {
   const data = await getStorage();
   const history = data.history || [];
   const container = document.getElementById("history-list");
   const empty = document.getElementById("history-empty");
   const notice = document.getElementById("history-notice");
+  const searchInput = document.getElementById("history-search");
 
   if (rolloverArchivedWeek) {
     notice.hidden = false;
-    notice.textContent = `Week ${rolloverArchivedWeek.weekNumber}, ${rolloverArchivedWeek.year} was moved here when the new ISO week started. You can still export it below.`;
+    notice.textContent = `Week ${rolloverArchivedWeek.weekNumber}, ${rolloverArchivedWeek.year} was moved here when the new ISO week started. You can still publish it below.`;
   } else {
     notice.hidden = true;
     notice.textContent = "";
   }
 
+  searchInput.hidden = history.length === 0;
+
   if (history.length === 0) {
-    container.innerHTML = "";
+    container.replaceChildren();
+    empty.textContent = "No archived weeks yet.";
+    empty.style.display = "block";
+    return;
+  }
+
+  // Read the query after the storage await so overlapping renders triggered
+  // by fast typing all paint whatever the input holds by then.
+  const tokens = parseHistorySearch(searchInput.value);
+  const searching = tokens.length > 0;
+
+  // Pair each week with its matching entries, keeping the week's position in
+  // the unfiltered history array so Publish still operates on the full week.
+  const visibleWeeks = [];
+  history.forEach((w, index) => {
+    const visibleEntries = searching ? w.entries.filter((e) => entryMatchesSearch(e, tokens)) : w.entries;
+    if (searching && visibleEntries.length === 0) return;
+    visibleWeeks.push({ week: w, visibleEntries, index });
+  });
+
+  if (visibleWeeks.length === 0) {
+    container.replaceChildren();
+    empty.textContent = "No entries match.";
     empty.style.display = "block";
     return;
   }
 
   empty.style.display = "none";
-  container.innerHTML = history
-    .map((w, index) => {
-      const { start, end } = getWeekBounds(w.year, w.weekNumber);
+  container.replaceChildren();
+  visibleWeeks.forEach(({ week: weekData, visibleEntries, index }) => {
+    const { start, end } = getWeekBounds(weekData.year, weekData.weekNumber);
+    const details = document.createElement("details");
+    details.className = "history-week";
+    details.open = searching;
 
-      // Group archived entries by day so each weekday gets its own separator,
-      // matching the This Week tab.
-      const dayGroups = new Map();
-      for (const e of w.entries) {
-        if (!dayGroups.has(e.date)) dayGroups.set(e.date, []);
-        dayGroups.get(e.date).push(e);
-      }
+    const entryCount = searching
+      ? `${visibleEntries.length} of ${weekData.entries.length} entries`
+      : `${weekData.entries.length} entries`;
+    const summary = document.createElement("summary");
+    const title = createTextElement(
+      "span",
+      "history-summary-title",
+      `Week ${weekData.weekNumber}, ${weekData.year} (${formatDateRange(start, end)}) — ${entryCount}`,
+    );
 
-      const entriesHtml = [...dayGroups.keys()]
-        .sort()
-        .map((date) => {
-          const dayHeader = `<div class="day-separator">${escapeHtml(formatDayHeader(date))}</div>`;
-          const rows = dayGroups
-            .get(date)
-            .map((e) => {
-              let meta = ENTRY_TYPES[e.type] || e.type;
-              if (e.rating) meta += ` — ${e.rating}/10`;
-              return `<div class="entry-item">
-            <div class="entry-title">${escapeHtml(e.title)}</div>
-            <div class="entry-meta">${escapeHtml(meta)}</div>
-          </div>`;
-            })
-            .join("");
-          return `<div class="day-group">${dayHeader}<div class="day-group-body">${rows}</div></div>`;
-        })
-        .join("");
-
-      return `<details class="history-week">
-        <summary>
-          <span class="history-summary-title">Week ${w.weekNumber}, ${w.year} (${formatDateRange(start, end)}) — ${w.entries.length} entries</span>
-          <span class="history-summary-actions">
-            <button class="history-publish" data-index="${index}">Publish</button>
-          </span>
-        </summary>
-        <div class="history-entries">${entriesHtml}</div>
-      </details>`;
-    })
-    .join("");
-
-  for (const button of container.querySelectorAll(".history-publish")) {
-    button.addEventListener("click", async (event) => {
+    const actions = document.createElement("span");
+    actions.className = "history-summary-actions";
+    const publishButton = document.createElement("button");
+    publishButton.className = "history-publish";
+    publishButton.dataset.index = String(index);
+    publishButton.textContent = "Publish";
+    publishButton.addEventListener("click", async (event) => {
       event.preventDefault();
       event.stopPropagation();
-      const index = Number(button.dataset.index);
-      const weekData = history[index];
-
-      if (!weekData) {
-        return;
-      }
 
       try {
         hideXOutput("history");
@@ -1128,22 +1180,304 @@ async function renderHistory() {
         showPublishStatus("history", getErrorMessage(error), true);
       }
     });
+    actions.appendChild(publishButton);
+    summary.append(title, actions);
+
+    const entries = document.createElement("div");
+    entries.className = "history-entries";
+    const dayGroups = new Map();
+    for (const entry of visibleEntries) {
+      if (!dayGroups.has(entry.date)) dayGroups.set(entry.date, []);
+      dayGroups.get(entry.date).push(entry);
+    }
+
+    for (const date of [...dayGroups.keys()].sort()) {
+      const dayGroup = document.createElement("div");
+      dayGroup.className = "day-group";
+      dayGroup.appendChild(createTextElement("div", "day-separator", formatDayHeader(date)));
+
+      const dayBody = document.createElement("div");
+      dayBody.className = "day-group-body";
+      for (const entry of dayGroups.get(date)) {
+        const item = createEntryItem(entry);
+        item.appendChild(createTextElement("div", "entry-meta", getEntryMeta(entry)));
+        dayBody.appendChild(item);
+      }
+
+      dayGroup.appendChild(dayBody);
+      entries.appendChild(dayGroup);
+    }
+
+    details.append(summary, entries);
+    container.appendChild(details);
+  });
+}
+
+document.getElementById("history-search").addEventListener("input", () => {
+  renderHistory();
+});
+
+// --- Full backup transfer ---
+
+function assertBackup(condition, message) {
+  if (!condition) {
+    throw new Error(message);
   }
 }
 
-// --- Utility ---
-
-function escapeHtml(str) {
-  const div = document.createElement("div");
-  div.textContent = str;
-  return div.innerHTML;
+function isPlainObject(value) {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
 }
+
+function validateString(value, label, maxLength, { allowEmpty = false } = {}) {
+  assertBackup(typeof value === "string", `${label} must be text.`);
+  assertBackup(value.length <= maxLength, `${label} is too long.`);
+  assertBackup(allowEmpty || value.trim().length > 0, `${label} cannot be empty.`);
+  return value;
+}
+
+function validateOptionalString(value, label, maxLength) {
+  if (value === undefined || value === null || value === "") return undefined;
+  return validateString(value, label, maxLength);
+}
+
+function validateDateString(value, label, { allowEmpty = false } = {}) {
+  if (allowEmpty && value === "") return "";
+  const date = validateString(value, label, 10);
+  assertBackup(/^\d{4}-\d{2}-\d{2}$/.test(date), `${label} must use YYYY-MM-DD.`);
+  assertBackup(!Number.isNaN(Date.parse(`${date}T12:00:00Z`)), `${label} is not a valid date.`);
+  return date;
+}
+
+function validateRating(value, label, { allowEmpty = false } = {}) {
+  if (allowEmpty && (value === undefined || value === null || value === "")) return undefined;
+  const rating = Number(value);
+  assertBackup(Number.isInteger(rating) && rating >= 1 && rating <= 10, `${label} must be from 1 to 10.`);
+  return rating;
+}
+
+function validateHttpUrl(value, label) {
+  if (value === undefined || value === null || value === "") return undefined;
+  const url = validateString(value, label, 10_000);
+  let parsed;
+  try {
+    parsed = new URL(url);
+  } catch {
+    throw new Error(`${label} is not a valid URL.`);
+  }
+  assertBackup(["http:", "https:"].includes(parsed.protocol), `${label} must use HTTP or HTTPS.`);
+  return url;
+}
+
+function validateTimestamp(value, label) {
+  if (value === undefined || value === null || value === "") return undefined;
+  const timestamp = validateString(value, label, 100);
+  assertBackup(!Number.isNaN(Date.parse(timestamp)), `${label} is not a valid timestamp.`);
+  return timestamp;
+}
+
+function validateEntry(value, label) {
+  assertBackup(isPlainObject(value), `${label} must be an object.`);
+  const type = validateString(value.type, `${label} type`, 30);
+  assertBackup(Object.hasOwn(ENTRY_TYPES, type), `${label} has an unknown type.`);
+
+  const entry = {
+    type,
+    title: validateString(value.title, `${label} title`, 5_000),
+    date: validateDateString(value.date, `${label} date`),
+  };
+  const url = validateHttpUrl(value.url, `${label} URL`);
+  const rating = validateRating(value.rating, `${label} rating`, { allowEmpty: true });
+  const note = validateOptionalString(value.note, `${label} note`, 20_000);
+  const createdAt = validateTimestamp(value.createdAt, `${label} creation time`);
+
+  if (url) entry.url = url;
+  if (rating !== undefined) entry.rating = rating;
+  if (note !== undefined) entry.note = note;
+  if (createdAt) entry.createdAt = createdAt;
+  return entry;
+}
+
+function validateWeek(value, label) {
+  assertBackup(isPlainObject(value), `${label} must be an object.`);
+  assertBackup(Number.isInteger(value.year) && value.year >= 2000 && value.year <= 2100, `${label} has an invalid year.`);
+  assertBackup(Number.isInteger(value.weekNumber) && value.weekNumber >= 1 && value.weekNumber <= 53, `${label} has an invalid week number.`);
+  assertBackup(Array.isArray(value.entries), `${label} entries must be a list.`);
+  assertBackup(value.entries.length <= MAX_ENTRIES_PER_WEEK, `${label} contains too many entries.`);
+
+  return {
+    weekStart: validateDateString(value.weekStart, `${label} start date`),
+    weekEnd: validateDateString(value.weekEnd, `${label} end date`),
+    weekNumber: value.weekNumber,
+    year: value.year,
+    entries: value.entries.map((entry, index) => validateEntry(entry, `${label}, entry ${index + 1}`)),
+  };
+}
+
+function validateDraft(value) {
+  if (value === undefined || value === null) return undefined;
+  assertBackup(isPlainObject(value), "Draft must be an object.");
+  const type = validateString(value.type || DEFAULT_ENTRY_TYPE, "Draft type", 30);
+  assertBackup(Object.hasOwn(ENTRY_TYPES, type), "Draft has an unknown type.");
+
+  const draft = {
+    type,
+    title: validateString(value.title || "", "Draft title", 5_000, { allowEmpty: true }),
+    date: validateDateString(value.date || "", "Draft date", { allowEmpty: true }),
+    note: validateString(value.note || "", "Draft note", 20_000, { allowEmpty: true }),
+    rating: value.rating === "" ? "" : validateRating(value.rating, "Draft rating", { allowEmpty: true }) || "",
+    url: "",
+  };
+  const url = validateHttpUrl(value.url, "Draft URL");
+  if (url) draft.url = url;
+  return draft;
+}
+
+function validateBackup(value) {
+  assertBackup(isPlainObject(value), "Backup must be a JSON object.");
+  assertBackup(value.format === BACKUP_FORMAT, "This is not a Media Log full backup.");
+  assertBackup(value.version === BACKUP_VERSION, `Backup version must be ${BACKUP_VERSION}.`);
+  assertBackup(isPlainObject(value.data), "Backup data is missing.");
+  assertBackup(Array.isArray(value.data.history), "Backup history must be a list.");
+  assertBackup(value.data.history.length <= MAX_HISTORY_WEEKS, "Backup contains too many archived weeks.");
+
+  const data = {
+    currentWeek: validateWeek(value.data.currentWeek, "Current week"),
+    history: value.data.history.map((week, index) => validateWeek(week, `History week ${index + 1}`)),
+    userName: validateString(value.data.userName || "", "Name", 200, { allowEmpty: true }),
+    theme: validateString(value.data.theme || DEFAULT_THEME, "Theme", 30),
+  };
+  assertBackup(THEMES.has(data.theme), "Backup has an unknown theme.");
+
+  const addDraft = validateDraft(value.data.addDraft);
+  if (addDraft) data.addDraft = addDraft;
+  return data;
+}
+
+function countBackupEntries(data) {
+  return (data.currentWeek?.entries?.length || 0)
+    + (data.history || []).reduce((total, week) => total + week.entries.length, 0);
+}
+
+function stableSerialize(value) {
+  if (Array.isArray(value)) return `[${value.map(stableSerialize).join(",")}]`;
+  if (isPlainObject(value)) {
+    return `{${Object.keys(value).sort().map((key) => `${JSON.stringify(key)}:${stableSerialize(value[key])}`).join(",")}}`;
+  }
+  return JSON.stringify(value);
+}
+
+function verifyPortableStorage(expected, actual) {
+  assertBackup(
+    stableSerialize(actual) === stableSerialize(expected),
+    "Import verification failed. Your previous Media Log data was not reported as replaced.",
+  );
+  return actual;
+}
+
+async function replacePortableStorage(data) {
+  await chrome.storage.local.set(data);
+  return verifyPortableStorage(data, await getPortableStorage());
+}
+
+function describeBackupCoverage(data) {
+  const history = data.history || [];
+  const historyWeeks = history.map((week) => week.weekNumber).sort((a, b) => a - b);
+  const sameYear = history.every((week) => week.year === data.currentWeek.year);
+  const historyLabel = sameYear && historyWeeks.length > 1
+    ? `Weeks ${historyWeeks[0]}-${historyWeeks.at(-1)}`
+    : `${history.length} archived weeks`;
+  const currentCount = data.currentWeek.entries.length;
+  return `Verified ${countBackupEntries(data)} entries. Archived ${historyLabel}; current Week ${data.currentWeek.weekNumber} has ${currentCount} entries.`;
+}
+
+function downloadJson(filename, value) {
+  const blob = new Blob([JSON.stringify(value, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
+function showBackupStatus(message, isError = false) {
+  const status = document.getElementById("backup-status");
+  status.textContent = message;
+  status.style.color = isError ? "var(--danger)" : "var(--accent)";
+}
+
+document.getElementById("btn-export-backup").addEventListener("click", async () => {
+  try {
+    const data = await getPortableStorage();
+    const backup = {
+      format: BACKUP_FORMAT,
+      version: BACKUP_VERSION,
+      exportedAt: new Date().toISOString(),
+      data: {
+        currentWeek: data.currentWeek,
+        history: data.history || [],
+        addDraft: data.addDraft,
+        userName: data.userName || "",
+        theme: THEMES.has(data.theme) ? data.theme : DEFAULT_THEME,
+      },
+    };
+    const date = backup.exportedAt.slice(0, 10);
+    downloadJson(`media-log-full-backup-${date}.json`, backup);
+    showBackupStatus(`Exported ${countBackupEntries(backup.data)} entries.`);
+  } catch (error) {
+    showBackupStatus(getErrorMessage(error), true);
+  }
+});
+
+const backupFileInput = document.getElementById("backup-file");
+
+document.getElementById("btn-import-backup").addEventListener("click", async () => {
+  if (!isTransferPage) {
+    await chrome.tabs.create({ url: chrome.runtime.getURL(TRANSFER_PAGE_PATH) });
+    return;
+  }
+  backupFileInput.click();
+});
+
+backupFileInput.addEventListener("change", async () => {
+  try {
+    const [file] = backupFileInput.files || [];
+    if (!file) return;
+    assertBackup(file.size <= MAX_BACKUP_BYTES, "Backup is larger than 10 MB.");
+    const data = validateBackup(JSON.parse(await file.text()));
+
+    await replacePortableStorage(data);
+    applyTheme(data.theme);
+    try {
+      localStorage.setItem("theme", data.theme);
+    } catch {}
+    document.getElementById("theme-select").value = data.theme;
+    document.getElementById("user-name").value = data.userName;
+    renderGreeting(data.userName);
+    await renderWeek();
+    await renderHistory();
+    await restoreAddDraft();
+    showBackupStatus(`${describeBackupCoverage(data)} You can close this tab and reopen Media Log.`);
+  } catch (error) {
+    showBackupStatus(getErrorMessage(error), true);
+  } finally {
+    backupFileInput.value = "";
+  }
+});
 
 // --- Init ---
 
 async function init() {
   await initTheme();
   await initUserName();
+
+  if (isTransferPage) {
+    document.body.classList.add("transfer-page");
+    switchTab("settings");
+    showBackupStatus("Select Import Backup, then choose the full backup file.");
+    return;
+  }
 
   const initialData = await ensureCurrentWeek();
   rolloverArchivedWeek = initialData.archivedWeek;

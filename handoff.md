@@ -2,12 +2,12 @@
 
 This repo is now the standalone Media Log product.
 
-It no longer depends on the old website publish bridge. The Chrome release path, iOS app, Supabase backend, and local sync server live in this repo.
+Chrome Stable and iOS no longer depend on the old website publish bridge. The Zen and Firefox local-use copy matches Chrome Nightly and keeps the bridge workflow.
 
 ## Current Product Shape
 
 - `chrome-stable/` is the Chrome Web Store target.
-- `firefox-extension/` is the Firefox and Zen local-use copy.
+- `firefox-extension/` is the Zen and Firefox local-use copy of Chrome Nightly.
 - `iphone-app/` is the SwiftUI iOS companion app.
 - `supabase/` is the production sync backend.
 - `scripts/sync-dev-server.js` is the local sync backend.
@@ -82,7 +82,7 @@ The one-command verification path runs safe migration, sync, and Stripe webhook 
 bun run verify
 ```
 
-That command also checks and lints the Firefox and Zen source. The migration smoke test runs Chrome and Firefox with synthetic private-looking data and checks that reports stay count-only. The sync smoke test writes one synthetic entry to a temporary local server, then simulates two offline clients and verifies both entries survive the merge. The Stripe webhook smoke test signs fake events and checks that only a paid `$2` USD checkout unlocks sync. These tests do not use private log data.
+That command also checks and lints the Firefox and Zen source. It compares the Zen and Firefox popup with Chrome Nightly and tests the full backup format. The migration smoke test runs against Chrome Stable with synthetic private-looking data and checks that reports stay count-only. The sync smoke test writes one synthetic entry to a temporary local server, then simulates two offline clients and verifies both entries survive the merge. The Stripe webhook smoke test signs fake events and checks that only a paid `$2` USD checkout unlocks sync. These tests do not use private log data.
 
 The install handoff is checked too. It must keep the Chrome, Firefox or Zen, iOS, Supabase, Stripe, paid sync, PostgreSQL, and migration steps documented.
 

@@ -243,6 +243,5 @@ async function runPopupMigrationSmokeTest(label, sourcePath, apiName) {
 }
 
 await runPopupMigrationSmokeTest("Chrome", `${ROOT}/chrome-stable/popup.js`, "chrome");
-await runPopupMigrationSmokeTest("Firefox", `${ROOT}/firefox-extension/popup.js`, "browser");
 
-console.log("Migration smoke test passed with count-only reports for Chrome and Firefox.");
+console.log("Chrome Stable migration smoke test passed with count-only reports.");

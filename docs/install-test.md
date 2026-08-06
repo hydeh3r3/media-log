@@ -8,7 +8,7 @@ Run the full local check first:
 bun run verify
 ```
 
-That command checks the Chrome package, Firefox source and lint, Supabase backend files, safe migration flow, Stripe webhook rules, local sync merge flow, iOS simulator build, and iOS release readiness.
+That command checks the Chrome package, Firefox source and lint, Chrome Nightly parity, Supabase backend files, safe migration flow, Stripe webhook rules, local sync merge flow, iOS simulator build, and iOS release readiness.
 
 ## Chrome Development Install
 
@@ -62,7 +62,7 @@ Manual Chrome Web Store work still remains:
 
 ## Firefox And Zen Install
 
-Zen currently uses the Firefox extension folder as a temporary add-on.
+Zen uses the Firefox extension folder as a temporary add-on. This copy matches Chrome Nightly and uses the local website publish bridge.
 
 Load this manifest:
 
@@ -72,18 +72,33 @@ Load this manifest:
 
 Steps:
 
-1. Open Zen or Firefox.
+1. Open Zen.
 2. Go to `about:debugging#/runtime/this-firefox`.
 3. Click `Load Temporary Add-on`.
 4. Pick the manifest file above.
 5. Open the Media Log toolbar button.
 
-Temporary add-ons unload when Zen or Firefox restarts. Reload the manifest from `about:debugging` after a restart.
+Temporary add-ons unload when Zen restarts. Reload the manifest from `about:debugging` after a restart. Media Log data stays in the Zen profile.
+
+To move all Chrome Nightly data into Zen:
+
+1. Open the Media Log toolbar button.
+2. Click the gear button.
+3. Click `Import Backup` under Data Transfer.
+4. Media Log opens a full transfer tab. Click `Import Backup` again in that tab.
+5. Pick the full backup JSON file.
+6. Wait for the green `Verified` message. It lists the saved weeks and entry counts.
+7. Close the transfer tab. Open History and check the weeks.
+
+The full tab stays open while Zen shows the file picker. After the write, Media Log reads the data back and checks it before showing `Verified`.
+
+The import replaces only Media Log data in Zen. It does not copy cookies, passwords, or normal browser history.
 
 Check the Firefox and Zen source with:
 
 ```sh
 bun run check:firefox
+bun run check:firefox-parity
 bun run lint:firefox
 ```
 
@@ -119,7 +134,7 @@ Start the local sync server:
 bun run sync:dev
 ```
 
-Use these settings in Chrome, Firefox or Zen, and iOS:
+Use these settings in Chrome Stable and iOS:
 
 - Mode: `Local dev`
 - Endpoint: `http://127.0.0.1:43189`

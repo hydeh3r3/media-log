@@ -279,6 +279,10 @@ button.secondary-action:hover {
   min-height: 18px;
 }
 
+.history-search {
+  margin-bottom: 10px;
+}
+
 .history-notice {
   margin-bottom: 10px;
   padding: 10px 12px;

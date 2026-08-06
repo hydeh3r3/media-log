@@ -25,7 +25,7 @@ Both clients use the same sync shape. They can sync through Supabase in producti
 - `scripts/`: build, lint, local sync, and verification scripts.
 - `shared/`: sync protocol notes.
 - `docs/`: audit, privacy, store, and backend setup notes.
-- `firefox-extension/`: Firefox and Zen local-use copy with the same sync flow.
+- `firefox-extension/`: Zen and Firefox local-use copy that matches the Chrome Nightly workflow.
 
 ## Verify Everything
 
@@ -35,7 +35,7 @@ Run:
 bun run verify
 ```
 
-This checks the Chrome source, lints the Chrome release manifest, builds the Chrome release zip, checks and lints the Firefox and Zen source, checks the Supabase backend files, checks the install handoff, runs safe migration and Stripe webhook smoke tests, runs a local sync smoke test, builds the iOS app for the simulator, and runs the iOS release checks.
+This checks the Chrome source, lints the Chrome release manifest, builds the Chrome release zip, checks and lints the Firefox and Zen source, verifies Chrome Nightly parity, checks the Supabase backend files, checks the install handoff, runs safe migration and Stripe webhook smoke tests, runs a local sync smoke test, builds the iOS app for the simulator, and runs the iOS release checks.
 
 Install and test steps live in [docs/install-test.md](docs/install-test.md).
 

@@ -1714,12 +1714,26 @@ document.getElementById("btn-new-week").addEventListener("click", async () => {
 
 // --- History ---
 
+function parseHistorySearch(query) {
+  return (query || "").toLowerCase().split(/\s+/).filter(Boolean);
+}
+
+// Every token must appear somewhere in the title, note, URL, or type label.
+function entryMatchesSearch(entry, tokens) {
+  const haystack = [entry.title, entry.note, entry.url, ENTRY_TYPES[entry.type] || entry.type]
+    .filter(Boolean)
+    .join("\n")
+    .toLowerCase();
+  return tokens.every((token) => haystack.includes(token));
+}
+
 async function renderHistory() {
   const data = await getStorage();
   const history = data.history || [];
   const container = document.getElementById("history-list");
   const empty = document.getElementById("history-empty");
   const notice = document.getElementById("history-notice");
+  const searchInput = document.getElementById("history-search");
 
   if (rolloverArchivedWeek) {
     notice.hidden = false;
@@ -1729,24 +1743,55 @@ async function renderHistory() {
     notice.textContent = "";
   }
 
+  searchInput.hidden = history.length === 0;
+
   if (history.length === 0) {
     container.replaceChildren();
+    empty.textContent = "No archived weeks yet.";
+    empty.style.display = "block";
+    return;
+  }
+
+  // Read the query after the storage await so overlapping renders triggered
+  // by fast typing all paint whatever the input holds by then.
+  const tokens = parseHistorySearch(searchInput.value);
+  const searching = tokens.length > 0;
+
+  // Pair each week with its matching entries, keeping the week's position in
+  // the unfiltered history array so Export still operates on the full week.
+  const visibleWeeks = [];
+  history.forEach((weekData, index) => {
+    const visibleEntries = searching
+      ? weekData.entries.filter((entry) => entryMatchesSearch(entry, tokens))
+      : weekData.entries;
+    if (searching && visibleEntries.length === 0) return;
+    visibleWeeks.push({ weekData, visibleEntries, index });
+  });
+
+  if (visibleWeeks.length === 0) {
+    container.replaceChildren();
+    empty.textContent = "No entries match.";
     empty.style.display = "block";
     return;
   }
 
   empty.style.display = "none";
   container.replaceChildren();
-  history.forEach((weekData, index) => {
+  visibleWeeks.forEach(({ weekData, visibleEntries, index }) => {
     const { start, end } = getWeekBounds(weekData.year, weekData.weekNumber);
     const details = document.createElement("details");
     details.className = "history-week";
+    // Expanded while searching so matches are visible without clicking.
+    details.open = searching;
 
+    const entryCount = searching
+      ? `${visibleEntries.length} of ${weekData.entries.length} entries`
+      : `${weekData.entries.length} entries`;
     const summary = document.createElement("summary");
     const title = createTextElement(
       "span",
       "history-summary-title",
-      `Week ${weekData.weekNumber}, ${weekData.year} (${formatDateRange(start, end)}) — ${weekData.entries.length} entries`,
+      `Week ${weekData.weekNumber}, ${weekData.year} (${formatDateRange(start, end)}) — ${entryCount}`,
     );
 
     const actions = document.createElement("span");
@@ -1771,7 +1816,7 @@ async function renderHistory() {
     // Group archived entries by day so each weekday gets its own separator,
     // matching the This Week tab.
     const dayGroups = new Map();
-    for (const entry of weekData.entries) {
+    for (const entry of visibleEntries) {
       if (!dayGroups.has(entry.date)) dayGroups.set(entry.date, []);
       dayGroups.get(entry.date).push(entry);
     }
@@ -1798,6 +1843,10 @@ async function renderHistory() {
     container.appendChild(details);
   });
 }
+
+document.getElementById("history-search").addEventListener("input", () => {
+  renderHistory();
+});
 
 // --- Sync ---
 

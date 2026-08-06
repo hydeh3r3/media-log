@@ -14,7 +14,7 @@ The repo has four main areas:
 
 The Chrome extension is the main product target. The Firefox folder is useful for Zen, but it is not the official store target for this goal.
 
-The Firefox and Zen copy now follows the same sync-capable popup shape as Chrome. It uses Firefox `browser.*` APIs, keeps the local-use Gecko ID, and no longer ships the old website publish bridge permissions.
+As of 2026-08-06, the Firefox and Zen copy matches Chrome Nightly. It uses Firefox `browser.*` APIs, keeps the local Gecko ID, uses the website publish bridge, and supports full backup export and import.
 
 ## Current Chrome Extension
 
@@ -63,7 +63,7 @@ Each entry has:
 - `rating`, optional
 - `note`, optional
 
-Old local entries are prepared for sync by adding stable IDs and edit timestamps. The migration UI reports counts only. The migration smoke test checks Chrome and Firefox with synthetic private-looking data and makes sure titles, URLs, and notes stay out of the report.
+Old Chrome Stable entries are prepared for sync by adding stable IDs and edit timestamps. The migration UI reports counts only. The migration smoke test checks Chrome Stable with synthetic private-looking data and makes sure titles, URLs, and notes stay out of the report. A separate parity test checks the Chrome Nightly and Firefox full backup flow.
 
 ## Current Permissions
 

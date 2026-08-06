@@ -212,11 +212,47 @@ struct HistoryView: View {
     @Bindable var store: MediaLogStore
     @Binding var editorEntry: MediaEntry?
     @Environment(\.medialogTheme) private var theme
+    @State private var searchText = ""
+
+    private var searchTokens: [String] {
+        searchText.lowercased().split(whereSeparator: \.isWhitespace).map(String.init)
+    }
+
+    // Weeks with entries reduced to search matches, paired with the week's
+    // full entry count for the section header. Weeks with no matches drop out.
+    private var visibleWeeks: [(week: MediaWeek, totalCount: Int)] {
+        let tokens = searchTokens
+        if tokens.isEmpty {
+            return store.snapshot.history.map { ($0, $0.entries.count) }
+        }
+        return store.snapshot.history.compactMap { week in
+            let matches = week.entries.filter { entryMatches($0, tokens: tokens) }
+            guard !matches.isEmpty else { return nil }
+            var filtered = week
+            filtered.entries = matches
+            return (filtered, week.entries.count)
+        }
+    }
+
+    // Every token must appear somewhere in the title, note, URL, or type label.
+    private func entryMatches(_ entry: MediaEntry, tokens: [String]) -> Bool {
+        let haystack = [entry.title, entry.note ?? "", entry.url ?? "", entry.type.label]
+            .joined(separator: "\n")
+            .lowercased()
+        return tokens.allSatisfy { haystack.contains($0) }
+    }
+
+    private func sectionTitle(_ week: MediaWeek, totalCount: Int) -> String {
+        let base = "Week \(week.weekNumber), \(week.year)"
+        guard !searchTokens.isEmpty else { return base }
+        return "\(base) — \(week.entries.count) of \(totalCount) entries"
+    }
 
     var body: some View {
         List {
-            ForEach(store.snapshot.history) { week in
-                Section("Week \(week.weekNumber), \(week.year)") {
+            ForEach(visibleWeeks, id: \.week.id) { visible in
+                let week = visible.week
+                Section(sectionTitle(week, totalCount: visible.totalCount)) {
                     ForEach(groupedDays(week), id: \.key) { day in
                         DaySeparator(text: dayHeader(day.key))
                             .listRowBackground(Color.clear)
@@ -239,9 +275,12 @@ struct HistoryView: View {
         }
         .scrollContentBackground(.hidden)
         .background(theme.bg)
+        .searchable(text: $searchText, prompt: "Search history")
         .overlay {
             if store.snapshot.history.isEmpty {
                 ContentUnavailableView("No archived weeks", systemImage: "archivebox")
+            } else if visibleWeeks.isEmpty {
+                ContentUnavailableView.search(text: searchText)
             }
         }
         .navigationTitle("History")

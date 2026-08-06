@@ -6,6 +6,7 @@
   "scripts": {
     "check:chrome": "node --check chrome-stable/popup.js",
     "check:firefox": "node --check firefox-extension/popup.js",
+    "check:firefox-parity": "node --check scripts/nightly-firefox-parity-test.js && bun run scripts/nightly-firefox-parity-test.js",
     "check:ios": "xcodebuild -project iphone-app/MediaLog.xcodeproj -scheme MediaLog -destination 'generic/platform=iOS Simulator' build",
     "check:ios-release": "node --check scripts/check-ios-release.js && bun run scripts/check-ios-release.js && xcodebuild -project iphone-app/MediaLog.xcodeproj -scheme MediaLog -configuration Release -destination 'generic/platform=iOS Simulator' build",
     "check:migration": "node --check scripts/migration-smoke-test.js && bun run scripts/migration-smoke-test.js",
@@ -23,6 +24,6 @@
     "supabase:deploy": "bunx supabase db push && bunx supabase functions deploy media-log-sync && bunx supabase functions deploy media-log-checkout && bunx supabase functions deploy media-log-stripe-webhook",
     "sync:dev": "bun run scripts/sync-dev-server.js",
     "verify:chrome": "bun run check:chrome && bun run lint:chrome && bun run package:chrome && bun run check:store-assets",
-    "verify": "bun run verify:chrome && bun run check:firefox && bun run lint:firefox && bun run check:supabase && bun run check:migration && bun run check:handoff && bun run check:stripe && bun run check:sync && bun run check:ios && bun run check:ios-release"
+    "verify": "bun run verify:chrome && bun run check:firefox && bun run check:firefox-parity && bun run lint:firefox && bun run check:supabase && bun run check:migration && bun run check:handoff && bun run check:stripe && bun run check:sync && bun run check:ios && bun run check:ios-release"
   }
 }

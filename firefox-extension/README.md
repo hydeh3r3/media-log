@@ -1,64 +1,57 @@
-# Media Log Firefox and Zen Extension
+# Media Log for Zen and Firefox
 
-This folder is the Firefox and Zen version of the Media Log extension.
+This folder is the Zen and Firefox copy of Chrome Nightly Media Log.
 
-It has the same popup, storage, active tab prefill, weekly history, JSON export, migration prep, and sync flow as the Chrome extension.
+It has the same:
 
-It uses Firefox WebExtension APIs, so load this folder in Firefox or Zen, not Chrome.
+- Add, This Week, History, and Settings screens
+- website publish buttons
+- active tab title and URL fill
+- history search
+- themes
+- full backup export and import
 
-The extension stores entries in the browser. When sync is enabled, it sends data to the sync endpoint you choose.
-
-Firefox's manifest declares authentication info, browsing activity, and website content because saved entries can include account sign-in data, URLs, page titles, and notes you choose to sync.
+The only code difference is the browser API name. Chrome uses `chrome.*`. Zen and Firefox use `browser.*`.
 
 ## Load in Zen
 
 1. Open Zen.
 2. Go to `about:debugging#/runtime/this-firefox`.
-3. Click `Load Temporary Add-on`.
-4. Select `/Users/wetbrain/Documents/workspace/media-log/firefox-extension/manifest.json`.
+3. Click **Load Temporary Add-on**.
+4. Pick `/Users/wetbrain/Documents/workspace/media-log/firefox-extension/manifest.json`.
 5. Open the Media Log toolbar button.
 
-Temporary add-ons stay loaded until Zen restarts. After a restart, repeat the same load step.
+Temporary add-ons unload when Zen restarts. Repeat these steps after a restart. Your Media Log data stays in the Zen profile.
 
-## Dev Sync
+## Import Chrome Nightly Data
 
-Run the local sync server from the repo root:
+1. Open Media Log in Zen.
+2. Click the gear button.
+3. Under **Data Transfer**, click **Import Backup**.
+4. In the full transfer tab, click **Import Backup** again.
+5. Pick a `media-log-full-backup-YYYY-MM-DD.json` file.
+6. Wait for the green **Verified** result, then check History.
 
-`bun run sync:dev`
+The full tab stays open during Zen's file picker. Media Log reads the saved data back before it reports success.
 
-Use these settings in the Sync tab:
+Import replaces Media Log data in Zen. It does not change browser history, cookies, passwords, or other extensions.
 
-- Mode: `Local dev`
-- Endpoint: `http://127.0.0.1:43189`
-- User ID: `personal`
-- Token: `dev-media-log-token`
+## Publish to the Website
 
-The dev server writes to `.local-sync/`, which is ignored.
+The publish buttons use the old local website bridge on port `43187`.
 
-## Production Sync
+Run the bridge in the website repo before you publish:
 
-Deploy the Supabase backend in `supabase/`.
+```sh
+bun run publish:bridge
+```
 
-Setup steps are in `docs/supabase-sync.md`.
+## Check the Extension
 
-Cross-device sync requires the `$2` sync unlock. The unlock is stored in PostgreSQL by the Supabase backend.
+Run:
 
-Use these settings in the Sync tab:
-
-- Mode: `Supabase`
-- Supabase URL: `https://<project-ref>.supabase.co`
-- Publishable key: your Supabase publishable key
-- Email: your Supabase account email
-- Password: your Supabase account password
-
-Click `Sign Up` if you need a new account. If Supabase asks you to confirm your email, confirm it and then click `Sign In`.
-
-After sign-in, click `Unlock Sync ($2)` to open Stripe Checkout.
-
-After payment, click `Sync Now`.
-
-Use `Reset Password` to send a Supabase password reset email. Supabase must have an Auth redirect URL set before the reset link can finish the password change.
-
-Do not use a service key in the extension. The password is used only for sign-in and is not saved.
-
-If sync says `Cross-device sync requires the $2 sync unlock.`, finish checkout or activate the user's sync entitlement in Supabase.
+```sh
+bun run check:firefox
+bun run check:firefox-parity
+bun run lint:firefox
+```

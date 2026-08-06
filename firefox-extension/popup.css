@@ -221,6 +221,10 @@ input, select, textarea {
   font-family: inherit;
 }
 
+input[hidden] {
+  display: none !important;
+}
+
 input:focus, select:focus, textarea:focus {
   outline: none;
   border-color: var(--accent);
@@ -231,7 +235,7 @@ textarea {
   resize: vertical;
 }
 
-button[type="submit"], .week-actions button, .history-summary-actions button, .sync-actions button, .migration-actions button, .auth-actions button {
+button[type="submit"], .week-actions button, .history-summary-actions button, .data-transfer-actions button {
   width: 100%;
   padding: 10px;
   margin-top: 4px;
@@ -245,7 +249,7 @@ button[type="submit"], .week-actions button, .history-summary-actions button, .s
   transition: background 0.15s;
 }
 
-button[type="submit"]:hover, .week-actions button:hover, .history-summary-actions button:hover, .sync-actions button:hover, .migration-actions button:hover, .auth-actions button:hover {
+button[type="submit"]:hover, .week-actions button:hover, .history-summary-actions button:hover, .data-transfer-actions button:hover {
   background: var(--accent-hover);
 }
 
@@ -256,7 +260,7 @@ button[type="submit"]:hover, .week-actions button:hover, .history-summary-action
   margin-top: 12px;
 }
 
-.week-actions #btn-export-week {
+.week-actions #btn-publish-week {
   grid-column: 1 / -1;
 }
 
@@ -279,6 +283,10 @@ button.secondary-action:hover {
   min-height: 18px;
 }
 
+.history-search {
+  margin-bottom: 10px;
+}
+
 .history-notice {
   margin-bottom: 10px;
   padding: 10px 12px;
@@ -289,6 +297,14 @@ button.secondary-action:hover {
   color: var(--muted-strong);
   font-size: 12px;
   line-height: 1.4;
+}
+
+.publish-panel {
+  margin-top: 12px;
+}
+
+.publish-panel[hidden] {
+  display: none !important;
 }
 
 /* Week entries list */
@@ -532,28 +548,47 @@ button.secondary-action:hover {
   font-size: 12px;
 }
 
-.sync-actions {
-  margin-top: 12px;
+.data-transfer {
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
 }
 
-.migration-actions {
-  margin-top: 8px;
+.data-transfer h2 {
+  margin-bottom: 6px;
+  color: var(--text);
+  font-size: 13px;
 }
 
-.auth-actions {
+.data-transfer p {
+  margin-bottom: 10px;
+  color: var(--muted-strong);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.data-transfer-actions {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 8px;
-  margin-bottom: 10px;
 }
 
-.sync-summary {
-  margin-top: 12px;
-  padding: 10px 12px;
-  background: var(--card);
+body.transfer-page {
+  width: min(560px, calc(100vw - 32px));
+  min-height: 100vh;
+  margin: 0 auto;
+  padding-top: 48px;
+}
+
+body.transfer-page header,
+body.transfer-page .tab-content:not(#tab-settings) {
+  display: none;
+}
+
+body.transfer-page #tab-settings {
+  display: block;
+  padding: 24px;
   border: 1px solid var(--border);
-  border-radius: 6px;
-  color: var(--muted-strong);
-  font-size: 12px;
-  line-height: 1.5;
+  border-radius: 12px;
+  background: var(--card);
 }

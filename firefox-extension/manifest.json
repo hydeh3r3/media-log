@@ -1,13 +1,12 @@
 {
   "manifest_version": 3,
   "name": "Media Log",
-  "version": "1.0.1",
-  "description": "Save and sync a weekly log of what you read, watch, play, and hear.",
-  "permissions": ["storage", "activeTab", "scripting"],
-  "optional_host_permissions": [
-    "https://*.supabase.co/*",
-    "http://127.0.0.1/*",
-    "http://localhost/*"
+  "version": "1.0.3",
+  "description": "Log weekly media consumption for blog posts",
+  "permissions": ["storage", "tabs", "activeTab", "scripting", "clipboardWrite"],
+  "host_permissions": [
+    "http://127.0.0.1:43187/*",
+    "http://localhost:43187/*"
   ],
   "action": {
     "default_popup": "popup.html",
@@ -26,7 +25,7 @@
     "gecko": {
       "id": "media-log@wetbrain.local",
       "data_collection_permissions": {
-        "required": ["authenticationInfo", "browsingActivity", "websiteContent"]
+        "required": ["browsingActivity", "websiteContent"]
       },
       "strict_min_version": "142.0"
     }

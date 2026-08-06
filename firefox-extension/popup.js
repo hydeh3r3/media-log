@@ -20,14 +20,13 @@ const ENTRY_TYPES = {
 };
 const SELECTABLE_ENTRY_TYPES = new Set(["anime", "article", "book", "film", "game", "manga", "music", "podcast", "tv"]);
 const DEFAULT_ENTRY_TYPE = "article";
-const STORAGE_KEYS = ["currentWeek", "history", "addDraft", "syncConfig", "syncSession", "syncState", "syncTombstones"];
-const SYNC_MODES = {
-  SUPABASE: "supabase",
-  LOCAL: "local",
-};
-const SUPABASE_SYNC_PATH = "/functions/v1/media-log-sync";
-const SUPABASE_CHECKOUT_PATH = "/functions/v1/media-log-checkout";
-const TOKEN_REFRESH_MARGIN_MS = 60_000;
+const BACKUP_FORMAT = "media-log-backup";
+const BACKUP_VERSION = 1;
+const MAX_BACKUP_BYTES = 10 * 1024 * 1024;
+const MAX_HISTORY_WEEKS = 1_000;
+const MAX_ENTRIES_PER_WEEK = 10_000;
+const TRANSFER_PAGE_PATH = "popup.html?transfer=1";
+const isTransferPage = new URLSearchParams(globalThis.location?.search || "").get("transfer") === "1";
 
 const WEEKDAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 const MONTHS = [
@@ -44,6 +43,7 @@ const MONTHS = [
   "November",
   "December",
 ];
+const BRIDGE_URLS = ["http://127.0.0.1:43187", "http://localhost:43187"];
 
 // --- ISO week utilities ---
 
@@ -94,6 +94,61 @@ function getWeekInfoForDate(dateStr) {
   };
 }
 
+function formatDayHeader(dateStr) {
+  const date = new Date(`${dateStr}T12:00:00Z`);
+  if (Number.isNaN(date.getTime())) return dateStr;
+  return `${WEEKDAYS[date.getUTCDay()]} · ${date.getUTCDate()} ${MONTHS[date.getUTCMonth()].slice(0, 3)}`;
+}
+
+const THEMES = new Set(["monet", "catppuccin", "tokyo-night", "dracula", "nier"]);
+const DEFAULT_THEME = "monet";
+
+function applyTheme(theme) {
+  document.documentElement.dataset.theme = THEMES.has(theme) ? theme : DEFAULT_THEME;
+}
+
+async function initTheme() {
+  const { theme } = await browser.storage.local.get(["theme"]);
+  const value = THEMES.has(theme) ? theme : DEFAULT_THEME;
+  applyTheme(value);
+  try {
+    localStorage.setItem("theme", value);
+  } catch {}
+
+  const select = document.getElementById("theme-select");
+  if (!select) return;
+  select.value = value;
+  select.addEventListener("change", async () => {
+    applyTheme(select.value);
+    try {
+      localStorage.setItem("theme", select.value);
+    } catch {}
+    await browser.storage.local.set({ theme: select.value });
+  });
+}
+
+function renderGreeting(name) {
+  const el = document.getElementById("greeting");
+  if (!el) return;
+  const trimmed = (name || "").trim();
+  el.textContent = trimmed
+    ? `Hey, ${trimmed} time to log what you enjoyed this week!`
+    : "Hey, time to log what you enjoyed this week!";
+}
+
+async function initUserName() {
+  const { userName } = await browser.storage.local.get(["userName"]);
+  renderGreeting(userName);
+
+  const input = document.getElementById("user-name");
+  if (!input) return;
+  input.value = userName || "";
+  input.addEventListener("input", async () => {
+    renderGreeting(input.value);
+    await browser.storage.local.set({ userName: input.value });
+  });
+}
+
 function switchTab(tabName) {
   for (const tab of document.querySelectorAll(".tab")) {
     tab.classList.toggle("active", tab.dataset.tab === tabName);
@@ -131,15 +186,45 @@ function normalizeCreatedAt(data) {
 // --- Storage helpers ---
 
 async function getStorage() {
-  return browser.storage.local.get(STORAGE_KEYS);
+  return browser.storage.local.get(["currentWeek", "history", "addDraft"]);
 }
 
 async function setStorage(data) {
   return browser.storage.local.set(data);
 }
 
+async function getPortableStorage() {
+  return browser.storage.local.get(["currentWeek", "history", "addDraft", "userName", "theme"]);
+}
+
+function getPublishElements(scope) {
+  return {
+    status: document.getElementById(`${scope}-publish-status`),
+  };
+}
+
+function showPublishStatus(scope, message, isError = false) {
+  const { status } = getPublishElements(scope);
+  status.textContent = message;
+  status.style.color = isError ? "var(--danger)" : "var(--accent)";
+}
+
 function getErrorMessage(error) {
   return error instanceof Error ? error.message : "Something went wrong.";
+}
+
+function showXOutput(scope, title) {
+  showPublishStatus(scope, `Prepared X version for "${title}"`);
+}
+
+function hideXOutput(scope) {
+  const { status } = getPublishElements(scope);
+  status.textContent = "";
+}
+
+function hideAllXOutputs() {
+  hideXOutput("week");
+  hideXOutput("history");
 }
 
 function getAddDraft() {
@@ -150,7 +235,6 @@ function getAddDraft() {
     date: document.getElementById("entry-date").value,
     rating: document.getElementById("entry-rating").value,
     note: document.getElementById("entry-note").value,
-    updatedAt: new Date().toISOString(),
   };
 }
 
@@ -233,7 +317,7 @@ function collectPageSignals() {
 
 // Extracts structured signals from the active tab. Requires the activeTab
 // grant (the popup opening counts as the user gesture). Returns null on
-// restricted pages (about:, addons, PDFs) so callers fall back to URL.
+// restricted pages (about:, web store, PDFs) so callers fall back to URL.
 async function extractPageSignals(tabId) {
   if (typeof tabId !== "number" || !browser.scripting?.executeScript) {
     return null;
@@ -494,12 +578,10 @@ function inferTypeFromTab(tab, pageSignals = null) {
 
 async function saveAddDraft() {
   await setStorage({ addDraft: getAddDraft() });
-  await markSyncDirty("draft");
 }
 
 async function clearAddDraft() {
   await browser.storage.local.remove("addDraft");
-  await markSyncDirty("draft-cleared");
 }
 
 async function restoreAddDraft() {
@@ -513,6 +595,38 @@ async function restoreAddDraft() {
   document.getElementById("entry-rating").value = addDraft.rating || "";
   document.getElementById("entry-note").value = addDraft.note || "";
   return true;
+}
+
+async function publishWeekToWebsite(weekData) {
+  const payload = {
+    weekNumber: weekData.weekNumber,
+    year: weekData.year,
+    weekStart: weekData.weekStart,
+    weekEnd: weekData.weekEnd,
+    entries: weekData.entries,
+  };
+
+  let lastError = "Publish bridge is not running.";
+  for (const baseUrl of BRIDGE_URLS) {
+    try {
+      const response = await fetch(`${baseUrl}/publish`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const result = await response.json();
+
+      if (!response.ok || !result.ok) {
+        throw new Error(result.error || `Publish failed with ${response.status}`);
+      }
+
+      return result;
+    } catch (error) {
+      lastError = error instanceof Error ? error.message : "Publish failed.";
+    }
+  }
+
+  throw new Error(`${lastError} Run "bun run publish:bridge" in the website repo first.`);
 }
 
 function sortEntries(entries) {
@@ -529,226 +643,6 @@ function sortEntries(entries) {
     .map(({ entry }) => entry);
 
   entries.splice(0, entries.length, ...sorted);
-}
-
-function createId() {
-  if (crypto.randomUUID) {
-    return crypto.randomUUID();
-  }
-  return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
-}
-
-function weekKey(week) {
-  return `${week.year}-W${String(week.weekNumber).padStart(2, "0")}`;
-}
-
-function timestampValue(value) {
-  const parsed = Date.parse(value || "");
-  return Number.isFinite(parsed) ? parsed : 0;
-}
-
-function newestTimestamp(a, b) {
-  return timestampValue(a) >= timestampValue(b) ? a : b;
-}
-
-function cloneSnapshot(data) {
-  return JSON.parse(
-    JSON.stringify({
-      currentWeek: data.currentWeek || null,
-      history: data.history || [],
-      addDraft: data.addDraft || null,
-      tombstones: data.syncTombstones || data.tombstones || {},
-    }),
-  );
-}
-
-function ensureEntryMetadata(entry) {
-  let changed = false;
-  if (!entry.id) {
-    entry.id = createId();
-    changed = true;
-  }
-  if (!entry.createdAt) {
-    entry.createdAt = new Date().toISOString();
-    changed = true;
-  }
-  if (!entry.updatedAt) {
-    entry.updatedAt = entry.createdAt;
-    changed = true;
-  }
-  return changed;
-}
-
-function normalizeSnapshot(snapshot) {
-  let changed = false;
-  const normalizeEntries = (entries = []) => {
-    for (const entry of entries) {
-      if (ensureEntryMetadata(entry)) {
-        changed = true;
-      }
-    }
-  };
-
-  normalizeEntries(snapshot.currentWeek?.entries);
-  for (const week of snapshot.history || []) {
-    normalizeEntries(week.entries);
-  }
-
-  if (snapshot.addDraft && !snapshot.addDraft.updatedAt) {
-    snapshot.addDraft.updatedAt = new Date().toISOString();
-    changed = true;
-  }
-
-  snapshot.tombstones = snapshot.tombstones || {};
-  return changed;
-}
-
-function getSnapshotFromStorage(data) {
-  const snapshot = cloneSnapshot(data);
-  normalizeSnapshot(snapshot);
-  return snapshot;
-}
-
-function mergeDraft(localDraft, remoteDraft) {
-  if (!localDraft) return remoteDraft || null;
-  if (!remoteDraft) return localDraft;
-  return timestampValue(localDraft.updatedAt) >= timestampValue(remoteDraft.updatedAt) ? localDraft : remoteDraft;
-}
-
-function mergeTombstones(localTombstones = {}, remoteTombstones = {}) {
-  const tombstones = { ...remoteTombstones };
-  for (const [entryId, deletedAt] of Object.entries(localTombstones)) {
-    tombstones[entryId] = newestTimestamp(deletedAt, tombstones[entryId]);
-  }
-  return tombstones;
-}
-
-function addWeekToMap(map, week) {
-  if (!week) return;
-  const key = weekKey(week);
-  const existing = map.get(key);
-  if (!existing) {
-    map.set(key, { ...week, entries: [...(week.entries || [])] });
-    return;
-  }
-
-  existing.weekStart = existing.weekStart || week.weekStart;
-  existing.weekEnd = existing.weekEnd || week.weekEnd;
-  existing.entries.push(...(week.entries || []));
-}
-
-function mergeWeekEntries(entries, tombstones) {
-  const byId = new Map();
-  for (const entry of entries) {
-    const existing = byId.get(entry.id);
-    if (!existing || timestampValue(entry.updatedAt) >= timestampValue(existing.updatedAt)) {
-      byId.set(entry.id, entry);
-    }
-  }
-
-  const merged = [];
-  for (const entry of byId.values()) {
-    const deletedAt = tombstones[entry.id];
-    if (deletedAt && timestampValue(deletedAt) >= timestampValue(entry.updatedAt)) {
-      continue;
-    }
-    merged.push(entry);
-  }
-
-  sortEntries(merged);
-  return merged;
-}
-
-function mergeSnapshots(localSnapshot, remoteSnapshot) {
-  if (!remoteSnapshot) return localSnapshot;
-
-  normalizeSnapshot(localSnapshot);
-  normalizeSnapshot(remoteSnapshot);
-
-  const tombstones = mergeTombstones(localSnapshot.tombstones, remoteSnapshot.tombstones);
-  const weeks = new Map();
-
-  addWeekToMap(weeks, remoteSnapshot.currentWeek);
-  for (const week of remoteSnapshot.history || []) addWeekToMap(weeks, week);
-  addWeekToMap(weeks, localSnapshot.currentWeek);
-  for (const week of localSnapshot.history || []) addWeekToMap(weeks, week);
-
-  for (const week of weeks.values()) {
-    week.entries = mergeWeekEntries(week.entries || [], tombstones);
-  }
-
-  const currentKey = localSnapshot.currentWeek
-    ? weekKey(localSnapshot.currentWeek)
-    : remoteSnapshot.currentWeek
-      ? weekKey(remoteSnapshot.currentWeek)
-      : null;
-  const currentWeek = currentKey ? weeks.get(currentKey) || null : null;
-  const history = [...weeks.entries()]
-    .filter(([key]) => key !== currentKey)
-    .map(([, week]) => week)
-    .sort((a, b) => b.year - a.year || b.weekNumber - a.weekNumber);
-
-  return {
-    currentWeek,
-    history,
-    addDraft: mergeDraft(localSnapshot.addDraft, remoteSnapshot.addDraft),
-    tombstones,
-  };
-}
-
-async function getClientId(syncState = null) {
-  const state = syncState || (await getStorage()).syncState || {};
-  if (state.clientId) return state.clientId;
-  return createId();
-}
-
-async function markSyncDirty(reason) {
-  const data = await getStorage();
-  const now = new Date().toISOString();
-  const syncState = {
-    ...(data.syncState || {}),
-    clientId: await getClientId(data.syncState || {}),
-    dirtyAt: now,
-    dirtyReason: reason,
-  };
-  await setStorage({ syncState });
-}
-
-async function saveSnapshot(snapshot, syncStatePatch = {}) {
-  const syncState = {
-    ...(await getStorage()).syncState,
-    ...syncStatePatch,
-  };
-  await setStorage({
-    currentWeek: snapshot.currentWeek,
-    history: snapshot.history || [],
-    addDraft: snapshot.addDraft || null,
-    syncTombstones: snapshot.tombstones || {},
-    syncState,
-  });
-}
-
-function createTextElement(tagName, className, text) {
-  const element = document.createElement(tagName);
-  if (className) {
-    element.className = className;
-  }
-  element.textContent = text;
-  return element;
-}
-
-function getEntryMeta(entry, includeDate = false) {
-  let meta = ENTRY_TYPES[entry.type] || entry.type;
-  if (entry.rating) meta += ` — ${entry.rating}/10`;
-  if (includeDate) meta += ` — ${entry.date}`;
-  return meta;
-}
-
-function createEntryItem(entry) {
-  const item = document.createElement("div");
-  item.className = "entry-item";
-  item.appendChild(createTextElement("div", "entry-title", entry.title));
-  return item;
 }
 
 function ensureHistoryWeek(data, weekInfo) {
@@ -797,25 +691,20 @@ async function ensureCurrentWeek() {
   const { start, end } = getWeekBounds(year, week);
   const data = await getStorage();
   const createdAtNormalized = normalizeCreatedAt(data);
-  const snapshot = getSnapshotFromStorage(data);
-  const metadataNormalized = JSON.stringify(snapshot) !== JSON.stringify(cloneSnapshot(data));
 
   if (data.currentWeek?.weekNumber === week && data.currentWeek.year === year) {
-    if (createdAtNormalized || metadataNormalized) {
-      await saveSnapshot(snapshot, {
-        ...(data.syncState || {}),
-        clientId: await getClientId(data.syncState || {}),
-      });
+    if (createdAtNormalized) {
+      await setStorage({ currentWeek: data.currentWeek, history: data.history || [] });
     }
-    return { ...data, ...snapshot, archivedWeek: null };
+    return { ...data, archivedWeek: null };
   }
 
   // Auto-archive stale week
-  const history = snapshot.history || [];
+  const history = data.history || [];
   let archivedWeek = null;
-  if (snapshot.currentWeek?.entries && snapshot.currentWeek.entries.length > 0) {
-    archivedWeek = snapshot.currentWeek;
-    history.unshift(snapshot.currentWeek);
+  if (data.currentWeek?.entries && data.currentWeek.entries.length > 0) {
+    archivedWeek = data.currentWeek;
+    history.unshift(data.currentWeek);
   }
 
   const currentWeek = {
@@ -826,485 +715,8 @@ async function ensureCurrentWeek() {
     entries: [],
   };
 
-  await saveSnapshot({ ...snapshot, currentWeek, history }, {
-    ...(data.syncState || {}),
-    clientId: await getClientId(data.syncState || {}),
-    dirtyAt: new Date().toISOString(),
-    dirtyReason: "week-rollover",
-  });
-  return { ...snapshot, currentWeek, history, archivedWeek };
-}
-
-function normalizeEndpoint(endpoint) {
-  const url = new URL(endpoint);
-  const path = url.pathname.replace(/\/$/, "");
-  if (!path.endsWith("/media-log")) {
-    url.pathname = `${path}/v1/media-log`;
-  }
-  url.search = "";
-  url.hash = "";
-  return url.toString();
-}
-
-function normalizeSupabaseUrl(value) {
-  const url = new URL(value);
-  if (url.protocol !== "https:") {
-    throw new Error("Supabase URL must use HTTPS.");
-  }
-  url.pathname = "";
-  url.search = "";
-  url.hash = "";
-  return url.toString().replace(/\/$/, "");
-}
-
-function supabaseFunctionEndpoint(supabaseUrl) {
-  return `${normalizeSupabaseUrl(supabaseUrl)}${SUPABASE_SYNC_PATH}`;
-}
-
-function supabaseCheckoutEndpoint(supabaseUrl) {
-  return `${normalizeSupabaseUrl(supabaseUrl)}${SUPABASE_CHECKOUT_PATH}`;
-}
-
-function syncResourceUrl(endpoint, userId) {
-  const url = new URL(normalizeEndpoint(endpoint));
-  url.searchParams.set("userId", userId || "personal");
-  return url.toString();
-}
-
-async function requestSyncHostPermission(endpoint) {
-  if (!browser.permissions?.contains || !browser.permissions?.request) {
-    return true;
-  }
-
-  const endpointUrl = new URL(endpoint);
-  const originPattern = `${endpointUrl.protocol}//${endpointUrl.hostname}/*`;
-  const hasPermission = await browser.permissions.contains({ origins: [originPattern] });
-  if (hasPermission) {
-    return true;
-  }
-
-  return browser.permissions.request({ origins: [originPattern] });
-}
-
-async function authRequest(config, grantType, body) {
-  const supabaseUrl = normalizeSupabaseUrl(config.supabaseUrl);
-  const response = await fetch(`${supabaseUrl}/auth/v1/token?grant_type=${grantType}`, {
-    method: "POST",
-    headers: {
-      apikey: config.supabaseAnonKey,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(body),
-  });
-  const result = await response.json();
-
-  if (!response.ok) {
-    throw new Error(result.error_description || result.msg || result.error || `Auth failed with ${response.status}`);
-  }
-
-  return {
-    accessToken: result.access_token,
-    refreshToken: result.refresh_token,
-    expiresAt: Date.now() + Math.max((result.expires_in || 3600) - 30, 1) * 1000,
-    userEmail: result.user?.email || config.email || "",
-  };
-}
-
-async function authActionRequest(config, path, body) {
-  const supabaseUrl = normalizeSupabaseUrl(config.supabaseUrl);
-  const response = await fetch(`${supabaseUrl}/auth/v1/${path}`, {
-    method: "POST",
-    headers: {
-      apikey: config.supabaseAnonKey,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(body),
-  });
-  const result = await response.json().catch(() => ({}));
-
-  if (!response.ok) {
-    throw new Error(result.error_description || result.msg || result.error || `Auth failed with ${response.status}`);
-  }
-
-  return result;
-}
-
-function sessionFromAuthResult(result, fallbackEmail) {
-  const tokenResult = result.session?.access_token ? result.session : result;
-  if (!tokenResult.access_token || !tokenResult.refresh_token) {
-    return null;
-  }
-
-  return {
-    accessToken: tokenResult.access_token,
-    refreshToken: tokenResult.refresh_token,
-    expiresAt: Date.now() + Math.max((tokenResult.expires_in || 3600) - 30, 1) * 1000,
-    userEmail: tokenResult.user?.email || result.user?.email || fallbackEmail || "",
-  };
-}
-
-async function signInWithSupabase(config, password) {
-  if (!config.supabaseUrl || !config.supabaseAnonKey || !config.email || !password) {
-    throw new Error("Supabase URL, key, email, and password are required.");
-  }
-
-  const allowed = await requestSyncHostPermission(config.supabaseUrl);
-  if (!allowed) {
-    throw new Error("Supabase host permission was not granted.");
-  }
-
-  const session = await authRequest(config, "password", {
-    email: config.email,
-    password,
-  });
-  await setStorage({ syncSession: session });
-  return session;
-}
-
-async function signUpWithSupabase(config, password) {
-  if (!config.supabaseUrl || !config.supabaseAnonKey || !config.email || !password) {
-    throw new Error("Supabase URL, key, email, and password are required.");
-  }
-
-  const allowed = await requestSyncHostPermission(config.supabaseUrl);
-  if (!allowed) {
-    throw new Error("Supabase host permission was not granted.");
-  }
-
-  const result = await authActionRequest(config, "signup", {
-    email: config.email,
-    password,
-  });
-  const session = sessionFromAuthResult(result, config.email);
-  if (session) {
-    await setStorage({ syncSession: session });
-  }
-  return session;
-}
-
-async function requestSupabasePasswordReset(config) {
-  if (!config.supabaseUrl || !config.supabaseAnonKey || !config.email) {
-    throw new Error("Supabase URL, key, and email are required.");
-  }
-
-  const allowed = await requestSyncHostPermission(config.supabaseUrl);
-  if (!allowed) {
-    throw new Error("Supabase host permission was not granted.");
-  }
-
-  await authActionRequest(config, "recover", {
-    email: config.email,
-  });
-}
-
-async function refreshSupabaseSession(config, session) {
-  if (!session?.refreshToken) {
-    throw new Error("Sign in to Supabase first.");
-  }
-
-  const refreshed = await authRequest(config, "refresh_token", {
-    refresh_token: session.refreshToken,
-  });
-  await setStorage({ syncSession: refreshed });
-  return refreshed;
-}
-
-async function signOutOfSupabase(config, session) {
-  if (session?.accessToken && config.supabaseUrl && config.supabaseAnonKey) {
-    const supabaseUrl = normalizeSupabaseUrl(config.supabaseUrl);
-    await fetch(`${supabaseUrl}/auth/v1/logout`, {
-      method: "POST",
-      headers: {
-        apikey: config.supabaseAnonKey,
-        Authorization: `Bearer ${session.accessToken}`,
-      },
-    }).catch(() => {});
-  }
-  await setStorage({ syncSession: null });
-}
-
-async function getSyncAuth(config, storedSession) {
-  const mode = config.mode || SYNC_MODES.SUPABASE;
-  if (mode === SYNC_MODES.LOCAL) {
-    if (!config.endpoint || !config.token) {
-      throw new Error("Local endpoint and token are required.");
-    }
-    return {
-      endpoint: normalizeEndpoint(config.endpoint),
-      token: config.token,
-      userId: config.userId || "personal",
-    };
-  }
-
-  if (!config.supabaseUrl || !config.supabaseAnonKey) {
-    throw new Error("Supabase URL and publishable key are required.");
-  }
-
-  const session = storedSession?.accessToken && storedSession.expiresAt > Date.now() + TOKEN_REFRESH_MARGIN_MS
-    ? storedSession
-    : await refreshSupabaseSession(config, storedSession);
-
-  return {
-    endpoint: supabaseFunctionEndpoint(config.supabaseUrl),
-    token: session.accessToken,
-    userId: config.userId || "personal",
-  };
-}
-
-async function createSyncUnlockCheckout(config, storedSession) {
-  if ((config.mode || SYNC_MODES.SUPABASE) !== SYNC_MODES.SUPABASE) {
-    throw new Error("Switch sync mode to Supabase first.");
-  }
-
-  const allowed = await requestSyncHostPermission(config.supabaseUrl);
-  if (!allowed) {
-    throw new Error("Supabase host permission was not granted.");
-  }
-
-  const auth = await getSyncAuth(config, storedSession);
-  const response = await fetch(supabaseCheckoutEndpoint(config.supabaseUrl), {
-    method: "POST",
-    headers: {
-      apikey: config.supabaseAnonKey,
-      Authorization: `Bearer ${auth.token}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({}),
-  });
-  const result = await response.json();
-
-  if (!response.ok || !result.ok || !result.checkoutUrl) {
-    throw new Error(result.error || `Checkout failed with ${response.status}`);
-  }
-
-  return result.checkoutUrl;
-}
-
-async function openExternalUrl(url) {
-  if (browser.tabs?.create) {
-    await browser.tabs.create({ url });
-    return;
-  }
-
-  window.open(url, "_blank", "noopener");
-}
-
-async function fetchSyncRecord(config) {
-  const response = await fetch(syncResourceUrl(config.endpoint, config.userId), {
-    headers: {
-      Authorization: `Bearer ${config.token}`,
-    },
-  });
-  const result = await response.json();
-
-  if (!response.ok || !result.ok) {
-    throw new Error(result.error || `Sync pull failed with ${response.status}`);
-  }
-
-  return result.record;
-}
-
-async function pushSyncRecord(config, clientId, snapshot) {
-  const response = await fetch(normalizeEndpoint(config.endpoint), {
-    method: "PUT",
-    headers: {
-      Authorization: `Bearer ${config.token}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      userId: config.userId || "personal",
-      clientId,
-      data: snapshot,
-    }),
-  });
-  const result = await response.json();
-
-  if (!response.ok || !result.ok) {
-    throw new Error(result.error || `Sync push failed with ${response.status}`);
-  }
-
-  return result.record;
-}
-
-function getSyncConfigFromForm() {
-  const mode = document.getElementById("sync-mode").value;
-  const supabaseUrl = document.getElementById("sync-supabase-url").value.trim();
-  return {
-    mode,
-    endpoint: document.getElementById("sync-endpoint").value.trim(),
-    userId: document.getElementById("sync-user-id").value.trim() || "personal",
-    token: document.getElementById("sync-token").value,
-    supabaseUrl,
-    supabaseAnonKey: document.getElementById("sync-supabase-key").value.trim(),
-    email: document.getElementById("sync-email").value.trim(),
-  };
-}
-
-function showSyncStatus(message, isError = false) {
-  const status = document.getElementById("sync-status");
-  status.textContent = message;
-  status.style.color = isError ? "var(--danger)" : "var(--accent)";
-}
-
-function renderSyncSummary(data) {
-  const currentEntries = data.currentWeek?.entries?.length || 0;
-  const historyWeeks = data.history?.length || 0;
-  const historyEntries = (data.history || []).reduce((sum, week) => sum + (week.entries?.length || 0), 0);
-  const migrationStats = getSnapshotStats(cloneSnapshot(data));
-  const config = data.syncConfig || {};
-  const session = data.syncSession || {};
-  const modeText = (config.mode || SYNC_MODES.SUPABASE) === SYNC_MODES.LOCAL ? "Local dev" : "Supabase";
-  const authText = config.mode === SYNC_MODES.LOCAL
-    ? "Local token saved"
-    : session.accessToken
-      ? `Signed in${session.userEmail ? ` as ${session.userEmail}` : ""}`
-      : "Not signed in";
-  const lastSyncedAt = data.syncState?.lastSyncedAt ? new Date(data.syncState.lastSyncedAt).toLocaleString() : "Never";
-  const dirtyText = data.syncState?.dirtyAt ? "Local changes waiting to sync" : "No local changes waiting";
-  const migrationText = migrationStats.entriesNeedingMetadata > 0
-    ? `${migrationStats.entriesNeedingMetadata} entries need local prep`
-    : "Local data is ready for sync";
-
-  document.getElementById("sync-summary").textContent =
-    `Mode: ${modeText}\nAuth: ${authText}\nCurrent entries: ${currentEntries}\nArchived weeks: ${historyWeeks}\nArchived entries: ${historyEntries}\nLast sync: ${lastSyncedAt}\n${dirtyText}\n${migrationText}`;
-}
-
-function getSnapshotStats(snapshot) {
-  const stats = {
-    currentEntries: snapshot.currentWeek?.entries?.length || 0,
-    historyWeeks: snapshot.history?.length || 0,
-    historyEntries: 0,
-    totalEntries: 0,
-    entriesNeedingMetadata: 0,
-    tombstones: Object.keys(snapshot.tombstones || {}).length,
-    draftPresent: Boolean(snapshot.addDraft?.title || snapshot.addDraft?.url || snapshot.addDraft?.note),
-  };
-
-  const addEntries = (entries = []) => {
-    for (const entry of entries) {
-      stats.totalEntries += 1;
-      if (!entry.id || !entry.createdAt || !entry.updatedAt) {
-        stats.entriesNeedingMetadata += 1;
-      }
-    }
-  };
-
-  addEntries(snapshot.currentWeek?.entries);
-  for (const week of snapshot.history || []) {
-    stats.historyEntries += week.entries?.length || 0;
-    addEntries(week.entries);
-  }
-
-  return stats;
-}
-
-function formatMigrationReport(report) {
-  const preparedCount = report.before.entriesNeedingMetadata;
-  const preparedText = preparedCount === 1
-    ? "Added missing metadata to 1 entry."
-    : `Added missing metadata to ${preparedCount} entries.`;
-  const draftText = report.after.draftPresent ? "Draft saved." : "No draft saved.";
-
-  return `Prepared local data. Entries: ${report.after.totalEntries}. Archived weeks: ${report.after.historyWeeks}. Tombstones: ${report.after.tombstones}. ${preparedText} ${draftText}`;
-}
-
-async function prepareLocalDataForSync() {
-  const beforeData = await getStorage();
-  const before = getSnapshotStats(cloneSnapshot(beforeData));
-  const currentData = await ensureCurrentWeek();
-  const snapshot = getSnapshotFromStorage(currentData);
-  const now = new Date().toISOString();
-  const syncStatePatch = {
-    ...(currentData.syncState || {}),
-    clientId: await getClientId(currentData.syncState || {}),
-  };
-
-  if (before.entriesNeedingMetadata > 0) {
-    syncStatePatch.dirtyAt = now;
-    syncStatePatch.dirtyReason = "migration";
-  }
-
-  await saveSnapshot(snapshot, syncStatePatch);
-
-  const afterData = await getStorage();
-  return {
-    before,
-    after: getSnapshotStats(cloneSnapshot(afterData)),
-  };
-}
-
-async function restoreSyncSettings() {
-  const data = await getStorage();
-  const config = data.syncConfig || {};
-  const mode = config.mode || SYNC_MODES.SUPABASE;
-  document.getElementById("sync-mode").value = mode;
-  document.getElementById("sync-endpoint").value = config.endpoint || "";
-  document.getElementById("sync-user-id").value = config.userId || "personal";
-  document.getElementById("sync-token").value = config.token || "";
-  document.getElementById("sync-supabase-url").value = config.supabaseUrl || "";
-  document.getElementById("sync-supabase-key").value = config.supabaseAnonKey || "";
-  document.getElementById("sync-email").value = config.email || data.syncSession?.userEmail || "";
-  document.getElementById("sync-password").value = "";
-  updateSyncModeFields(mode);
-  renderSyncSummary(data);
-}
-
-function updateSyncModeFields(mode) {
-  const localFields = document.querySelector(".sync-local-fields");
-  const supabaseFields = document.querySelector(".sync-supabase-fields");
-  const isLocal = mode === SYNC_MODES.LOCAL;
-  localFields.hidden = !isLocal;
-  supabaseFields.hidden = isLocal;
-}
-
-function configForSave(config) {
-  if (config.mode === SYNC_MODES.LOCAL) {
-    return {
-      mode: SYNC_MODES.LOCAL,
-      endpoint: normalizeEndpoint(config.endpoint),
-      userId: config.userId || "personal",
-      token: config.token,
-    };
-  }
-
-  return {
-    mode: SYNC_MODES.SUPABASE,
-    endpoint: supabaseFunctionEndpoint(config.supabaseUrl),
-    userId: config.userId || "personal",
-    supabaseUrl: normalizeSupabaseUrl(config.supabaseUrl),
-    supabaseAnonKey: config.supabaseAnonKey,
-    email: config.email,
-  };
-}
-
-async function syncNow() {
-  const data = await ensureCurrentWeek();
-  const config = data.syncConfig || getSyncConfigFromForm();
-  const auth = await getSyncAuth(config, data.syncSession || null);
-
-  const allowed = await requestSyncHostPermission(auth.endpoint);
-  if (!allowed) {
-    throw new Error("Sync host permission was not granted.");
-  }
-
-  const clientId = await getClientId(data.syncState || {});
-  const localSnapshot = getSnapshotFromStorage(data);
-  const remoteRecord = await fetchSyncRecord(auth);
-  const mergedSnapshot = mergeSnapshots(localSnapshot, remoteRecord.data);
-  const savedRecord = await pushSyncRecord(auth, clientId, mergedSnapshot);
-  const returnedSnapshot = savedRecord.data || mergedSnapshot;
-  const now = new Date().toISOString();
-
-  await saveSnapshot(returnedSnapshot, {
-    ...(data.syncState || {}),
-    clientId,
-    lastRevision: savedRecord.revision,
-    lastSyncedAt: now,
-    dirtyAt: null,
-    dirtyReason: null,
-  });
-
-  return savedRecord;
+  await setStorage({ currentWeek, history });
+  return { currentWeek, history, archivedWeek };
 }
 
 // --- Tab switching ---
@@ -1315,7 +727,6 @@ for (const btn of document.querySelectorAll(".tab")) {
 
     if (btn.dataset.tab === "week") renderWeek();
     if (btn.dataset.tab === "history") renderHistory();
-    if (btn.dataset.tab === "sync") restoreSyncSettings();
   });
 }
 
@@ -1375,14 +786,11 @@ document.getElementById("entry-form").addEventListener("submit", async (e) => {
 
   if (!title || !date) return;
 
-  const now = new Date().toISOString();
   const entry = {
-    id: createId(),
     type,
     title,
     date,
-    createdAt: now,
-    updatedAt: now,
+    createdAt: new Date().toISOString(),
   };
   if (url) entry.url = url;
   if (rating) entry.rating = Number.parseInt(rating, 10);
@@ -1391,7 +799,6 @@ document.getElementById("entry-form").addEventListener("submit", async (e) => {
   const data = await ensureCurrentWeek();
   const { targetWeek } = placeEntryInWeek(data, entry);
   await setStorage({ currentWeek: data.currentWeek, history: data.history || [] });
-  await markSyncDirty("entry-added");
   await clearAddDraft();
 
   // Reset form for the next entry
@@ -1412,59 +819,24 @@ document.getElementById("entry-form").addEventListener("submit", async (e) => {
 
 // --- This Week ---
 
-function formatDayHeader(dateStr) {
-  const date = new Date(`${dateStr}T12:00:00Z`);
-  if (Number.isNaN(date.getTime())) return dateStr;
-  return `${WEEKDAYS[date.getUTCDay()]} · ${date.getUTCDate()} ${MONTHS[date.getUTCMonth()].slice(0, 3)}`;
+function createTextElement(tagName, className, text) {
+  const element = document.createElement(tagName);
+  element.className = className;
+  element.textContent = text;
+  return element;
 }
 
-const THEMES = new Set(["monet", "catppuccin", "tokyo-night", "dracula", "nier"]);
-const DEFAULT_THEME = "monet";
-
-function applyTheme(theme) {
-  document.documentElement.dataset.theme = THEMES.has(theme) ? theme : DEFAULT_THEME;
+function getEntryMeta(entry) {
+  let meta = ENTRY_TYPES[entry.type] || entry.type;
+  if (entry.rating) meta += ` — ${entry.rating}/10`;
+  return meta;
 }
 
-async function initTheme() {
-  const { theme } = await browser.storage.local.get(["theme"]);
-  const value = THEMES.has(theme) ? theme : DEFAULT_THEME;
-  applyTheme(value);
-  try {
-    localStorage.setItem("theme", value);
-  } catch {}
-
-  const select = document.getElementById("theme-select");
-  if (!select) return;
-  select.value = value;
-  select.addEventListener("change", async () => {
-    applyTheme(select.value);
-    try {
-      localStorage.setItem("theme", select.value);
-    } catch {}
-    await browser.storage.local.set({ theme: select.value });
-  });
-}
-
-function renderGreeting(name) {
-  const el = document.getElementById("greeting");
-  if (!el) return;
-  const trimmed = (name || "").trim();
-  el.textContent = trimmed
-    ? `Hey, ${trimmed} time to log what you enjoyed this week!`
-    : "Hey, time to log what you enjoyed this week!";
-}
-
-async function initUserName() {
-  const { userName } = await browser.storage.local.get(["userName"]);
-  renderGreeting(userName);
-
-  const input = document.getElementById("user-name");
-  if (!input) return;
-  input.value = userName || "";
-  input.addEventListener("input", async () => {
-    renderGreeting(input.value);
-    await browser.storage.local.set({ userName: input.value });
-  });
+function createEntryItem(entry) {
+  const item = document.createElement("div");
+  item.className = "entry-item";
+  item.appendChild(createTextElement("div", "entry-title", entry.title));
+  return item;
 }
 
 async function renderWeek() {
@@ -1597,12 +969,10 @@ document.getElementById("edit-form").addEventListener("submit", async (e) => {
   if (!entry) return;
 
   const updatedEntry = {
-    id: entry.id || createId(),
     type: document.getElementById("edit-type").value,
     title: document.getElementById("edit-title").value.trim(),
     date: document.getElementById("edit-date").value,
-    createdAt: entry.createdAt || new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
+    createdAt: entry.createdAt,
   };
   const url = document.getElementById("edit-url").value.trim();
   if (url) {
@@ -1621,7 +991,6 @@ document.getElementById("edit-form").addEventListener("submit", async (e) => {
   const { movedToCurrentWeek } = placeEntryInWeek(data, updatedEntry);
 
   await setStorage({ currentWeek: data.currentWeek, history: data.history || [] });
-  await markSyncDirty("entry-edited");
   hideEditForm();
 
   if (movedToCurrentWeek) {
@@ -1641,12 +1010,7 @@ async function deleteEntry(index) {
   if (!entry) return;
 
   data.currentWeek.entries.splice(index, 1);
-  const syncTombstones = {
-    ...(data.syncTombstones || {}),
-    [entry.id || createId()]: new Date().toISOString(),
-  };
-  await setStorage({ currentWeek: data.currentWeek, syncTombstones });
-  await markSyncDirty("entry-deleted");
+  await setStorage({ currentWeek: data.currentWeek });
   hideEditForm();
   renderWeek();
 }
@@ -1674,14 +1038,29 @@ function downloadWeekExport(weekData) {
   URL.revokeObjectURL(url);
 }
 
-// --- Export and Week Control ---
+// --- End Week (Export) ---
 
-document.getElementById("btn-export-week").addEventListener("click", async () => {
+document.getElementById("btn-end-week").addEventListener("click", async () => {
   const data = await ensureCurrentWeek();
   downloadWeekExport(data.currentWeek);
 });
 
-async function startFreshWeek() {
+document.getElementById("btn-publish-week").addEventListener("click", async () => {
+  const data = await ensureCurrentWeek();
+
+  try {
+    hideXOutput("week");
+    showPublishStatus("week", "Publishing current week...");
+    const result = await publishWeekToWebsite(data.currentWeek);
+    showPublishStatus("week", `Published "${result.title}" to website files.`);
+  } catch (error) {
+    showPublishStatus("week", getErrorMessage(error), true);
+  }
+});
+
+// --- Start New Week ---
+
+document.getElementById("btn-new-week").addEventListener("click", async () => {
   const data = await ensureCurrentWeek();
   const history = data.history || [];
 
@@ -1700,19 +1079,23 @@ async function startFreshWeek() {
   };
 
   await setStorage({ currentWeek, history });
-  await markSyncDirty("week-started");
   renderWeek();
-}
-
-document.getElementById("btn-end-week").addEventListener("click", startFreshWeek);
-
-// --- Start New Week ---
-
-document.getElementById("btn-new-week").addEventListener("click", async () => {
-  await startFreshWeek();
 });
 
 // --- History ---
+
+function parseHistorySearch(query) {
+  return (query || "").toLowerCase().split(/\s+/).filter(Boolean);
+}
+
+// Every token must appear somewhere in the title, note, URL, or type label.
+function entryMatchesSearch(entry, tokens) {
+  const haystack = [entry.title, entry.note, entry.url, ENTRY_TYPES[entry.type] || entry.type]
+    .filter(Boolean)
+    .join("\n")
+    .toLowerCase();
+  return tokens.every((token) => haystack.includes(token));
+}
 
 async function renderHistory() {
   const data = await getStorage();
@@ -1720,58 +1103,90 @@ async function renderHistory() {
   const container = document.getElementById("history-list");
   const empty = document.getElementById("history-empty");
   const notice = document.getElementById("history-notice");
+  const searchInput = document.getElementById("history-search");
 
   if (rolloverArchivedWeek) {
     notice.hidden = false;
-    notice.textContent = `Week ${rolloverArchivedWeek.weekNumber}, ${rolloverArchivedWeek.year} was moved here when the new ISO week started. You can still export it below.`;
+    notice.textContent = `Week ${rolloverArchivedWeek.weekNumber}, ${rolloverArchivedWeek.year} was moved here when the new ISO week started. You can still publish it below.`;
   } else {
     notice.hidden = true;
     notice.textContent = "";
   }
 
+  searchInput.hidden = history.length === 0;
+
   if (history.length === 0) {
     container.replaceChildren();
+    empty.textContent = "No archived weeks yet.";
+    empty.style.display = "block";
+    return;
+  }
+
+  // Read the query after the storage await so overlapping renders triggered
+  // by fast typing all paint whatever the input holds by then.
+  const tokens = parseHistorySearch(searchInput.value);
+  const searching = tokens.length > 0;
+
+  // Pair each week with its matching entries, keeping the week's position in
+  // the unfiltered history array so Publish still operates on the full week.
+  const visibleWeeks = [];
+  history.forEach((w, index) => {
+    const visibleEntries = searching ? w.entries.filter((e) => entryMatchesSearch(e, tokens)) : w.entries;
+    if (searching && visibleEntries.length === 0) return;
+    visibleWeeks.push({ week: w, visibleEntries, index });
+  });
+
+  if (visibleWeeks.length === 0) {
+    container.replaceChildren();
+    empty.textContent = "No entries match.";
     empty.style.display = "block";
     return;
   }
 
   empty.style.display = "none";
   container.replaceChildren();
-  history.forEach((weekData, index) => {
+  visibleWeeks.forEach(({ week: weekData, visibleEntries, index }) => {
     const { start, end } = getWeekBounds(weekData.year, weekData.weekNumber);
     const details = document.createElement("details");
     details.className = "history-week";
+    details.open = searching;
 
+    const entryCount = searching
+      ? `${visibleEntries.length} of ${weekData.entries.length} entries`
+      : `${weekData.entries.length} entries`;
     const summary = document.createElement("summary");
     const title = createTextElement(
       "span",
       "history-summary-title",
-      `Week ${weekData.weekNumber}, ${weekData.year} (${formatDateRange(start, end)}) — ${weekData.entries.length} entries`,
+      `Week ${weekData.weekNumber}, ${weekData.year} (${formatDateRange(start, end)}) — ${entryCount}`,
     );
 
     const actions = document.createElement("span");
     actions.className = "history-summary-actions";
-
-    const exportButton = document.createElement("button");
-    exportButton.className = "history-export";
-    exportButton.dataset.index = String(index);
-    exportButton.textContent = "Export";
-    exportButton.addEventListener("click", (event) => {
+    const publishButton = document.createElement("button");
+    publishButton.className = "history-publish";
+    publishButton.dataset.index = String(index);
+    publishButton.textContent = "Publish";
+    publishButton.addEventListener("click", async (event) => {
       event.preventDefault();
       event.stopPropagation();
-      downloadWeekExport(weekData);
-    });
 
-    actions.appendChild(exportButton);
+      try {
+        hideXOutput("history");
+        showPublishStatus("history", `Publishing Week ${weekData.weekNumber}...`);
+        const result = await publishWeekToWebsite(weekData);
+        showPublishStatus("history", `Published "${result.title}" to website files.`);
+      } catch (error) {
+        showPublishStatus("history", getErrorMessage(error), true);
+      }
+    });
+    actions.appendChild(publishButton);
     summary.append(title, actions);
 
     const entries = document.createElement("div");
     entries.className = "history-entries";
-
-    // Group archived entries by day so each weekday gets its own separator,
-    // matching the This Week tab.
     const dayGroups = new Map();
-    for (const entry of weekData.entries) {
+    for (const entry of visibleEntries) {
       if (!dayGroups.has(entry.date)) dayGroups.set(entry.date, []);
       dayGroups.get(entry.date).push(entry);
     }
@@ -1783,7 +1198,6 @@ async function renderHistory() {
 
       const dayBody = document.createElement("div");
       dayBody.className = "day-group-body";
-
       for (const entry of dayGroups.get(date)) {
         const item = createEntryItem(entry);
         item.appendChild(createTextElement("div", "entry-meta", getEntryMeta(entry)));
@@ -1799,138 +1213,256 @@ async function renderHistory() {
   });
 }
 
-// --- Sync ---
+document.getElementById("history-search").addEventListener("input", () => {
+  renderHistory();
+});
 
-document.getElementById("sync-form").addEventListener("submit", async (event) => {
-  event.preventDefault();
+// --- Full backup transfer ---
 
+function assertBackup(condition, message) {
+  if (!condition) {
+    throw new Error(message);
+  }
+}
+
+function isPlainObject(value) {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+
+function validateString(value, label, maxLength, { allowEmpty = false } = {}) {
+  assertBackup(typeof value === "string", `${label} must be text.`);
+  assertBackup(value.length <= maxLength, `${label} is too long.`);
+  assertBackup(allowEmpty || value.trim().length > 0, `${label} cannot be empty.`);
+  return value;
+}
+
+function validateOptionalString(value, label, maxLength) {
+  if (value === undefined || value === null || value === "") return undefined;
+  return validateString(value, label, maxLength);
+}
+
+function validateDateString(value, label, { allowEmpty = false } = {}) {
+  if (allowEmpty && value === "") return "";
+  const date = validateString(value, label, 10);
+  assertBackup(/^\d{4}-\d{2}-\d{2}$/.test(date), `${label} must use YYYY-MM-DD.`);
+  assertBackup(!Number.isNaN(Date.parse(`${date}T12:00:00Z`)), `${label} is not a valid date.`);
+  return date;
+}
+
+function validateRating(value, label, { allowEmpty = false } = {}) {
+  if (allowEmpty && (value === undefined || value === null || value === "")) return undefined;
+  const rating = Number(value);
+  assertBackup(Number.isInteger(rating) && rating >= 1 && rating <= 10, `${label} must be from 1 to 10.`);
+  return rating;
+}
+
+function validateHttpUrl(value, label) {
+  if (value === undefined || value === null || value === "") return undefined;
+  const url = validateString(value, label, 10_000);
+  let parsed;
   try {
-    const config = configForSave(getSyncConfigFromForm());
-    const permissionTarget = config.mode === SYNC_MODES.LOCAL ? config.endpoint : config.supabaseUrl;
-    const allowed = await requestSyncHostPermission(permissionTarget);
-    if (!allowed) {
-      throw new Error("Sync host permission was not granted.");
-    }
+    parsed = new URL(url);
+  } catch {
+    throw new Error(`${label} is not a valid URL.`);
+  }
+  assertBackup(["http:", "https:"].includes(parsed.protocol), `${label} must use HTTP or HTTPS.`);
+  return url;
+}
 
-    await setStorage({ syncConfig: config });
-    await restoreSyncSettings();
-    showSyncStatus("Sync settings saved.");
+function validateTimestamp(value, label) {
+  if (value === undefined || value === null || value === "") return undefined;
+  const timestamp = validateString(value, label, 100);
+  assertBackup(!Number.isNaN(Date.parse(timestamp)), `${label} is not a valid timestamp.`);
+  return timestamp;
+}
+
+function validateEntry(value, label) {
+  assertBackup(isPlainObject(value), `${label} must be an object.`);
+  const type = validateString(value.type, `${label} type`, 30);
+  assertBackup(Object.hasOwn(ENTRY_TYPES, type), `${label} has an unknown type.`);
+
+  const entry = {
+    type,
+    title: validateString(value.title, `${label} title`, 5_000),
+    date: validateDateString(value.date, `${label} date`),
+  };
+  const url = validateHttpUrl(value.url, `${label} URL`);
+  const rating = validateRating(value.rating, `${label} rating`, { allowEmpty: true });
+  const note = validateOptionalString(value.note, `${label} note`, 20_000);
+  const createdAt = validateTimestamp(value.createdAt, `${label} creation time`);
+
+  if (url) entry.url = url;
+  if (rating !== undefined) entry.rating = rating;
+  if (note !== undefined) entry.note = note;
+  if (createdAt) entry.createdAt = createdAt;
+  return entry;
+}
+
+function validateWeek(value, label) {
+  assertBackup(isPlainObject(value), `${label} must be an object.`);
+  assertBackup(Number.isInteger(value.year) && value.year >= 2000 && value.year <= 2100, `${label} has an invalid year.`);
+  assertBackup(Number.isInteger(value.weekNumber) && value.weekNumber >= 1 && value.weekNumber <= 53, `${label} has an invalid week number.`);
+  assertBackup(Array.isArray(value.entries), `${label} entries must be a list.`);
+  assertBackup(value.entries.length <= MAX_ENTRIES_PER_WEEK, `${label} contains too many entries.`);
+
+  return {
+    weekStart: validateDateString(value.weekStart, `${label} start date`),
+    weekEnd: validateDateString(value.weekEnd, `${label} end date`),
+    weekNumber: value.weekNumber,
+    year: value.year,
+    entries: value.entries.map((entry, index) => validateEntry(entry, `${label}, entry ${index + 1}`)),
+  };
+}
+
+function validateDraft(value) {
+  if (value === undefined || value === null) return undefined;
+  assertBackup(isPlainObject(value), "Draft must be an object.");
+  const type = validateString(value.type || DEFAULT_ENTRY_TYPE, "Draft type", 30);
+  assertBackup(Object.hasOwn(ENTRY_TYPES, type), "Draft has an unknown type.");
+
+  const draft = {
+    type,
+    title: validateString(value.title || "", "Draft title", 5_000, { allowEmpty: true }),
+    date: validateDateString(value.date || "", "Draft date", { allowEmpty: true }),
+    note: validateString(value.note || "", "Draft note", 20_000, { allowEmpty: true }),
+    rating: value.rating === "" ? "" : validateRating(value.rating, "Draft rating", { allowEmpty: true }) || "",
+    url: "",
+  };
+  const url = validateHttpUrl(value.url, "Draft URL");
+  if (url) draft.url = url;
+  return draft;
+}
+
+function validateBackup(value) {
+  assertBackup(isPlainObject(value), "Backup must be a JSON object.");
+  assertBackup(value.format === BACKUP_FORMAT, "This is not a Media Log full backup.");
+  assertBackup(value.version === BACKUP_VERSION, `Backup version must be ${BACKUP_VERSION}.`);
+  assertBackup(isPlainObject(value.data), "Backup data is missing.");
+  assertBackup(Array.isArray(value.data.history), "Backup history must be a list.");
+  assertBackup(value.data.history.length <= MAX_HISTORY_WEEKS, "Backup contains too many archived weeks.");
+
+  const data = {
+    currentWeek: validateWeek(value.data.currentWeek, "Current week"),
+    history: value.data.history.map((week, index) => validateWeek(week, `History week ${index + 1}`)),
+    userName: validateString(value.data.userName || "", "Name", 200, { allowEmpty: true }),
+    theme: validateString(value.data.theme || DEFAULT_THEME, "Theme", 30),
+  };
+  assertBackup(THEMES.has(data.theme), "Backup has an unknown theme.");
+
+  const addDraft = validateDraft(value.data.addDraft);
+  if (addDraft) data.addDraft = addDraft;
+  return data;
+}
+
+function countBackupEntries(data) {
+  return (data.currentWeek?.entries?.length || 0)
+    + (data.history || []).reduce((total, week) => total + week.entries.length, 0);
+}
+
+function stableSerialize(value) {
+  if (Array.isArray(value)) return `[${value.map(stableSerialize).join(",")}]`;
+  if (isPlainObject(value)) {
+    return `{${Object.keys(value).sort().map((key) => `${JSON.stringify(key)}:${stableSerialize(value[key])}`).join(",")}}`;
+  }
+  return JSON.stringify(value);
+}
+
+function verifyPortableStorage(expected, actual) {
+  assertBackup(
+    stableSerialize(actual) === stableSerialize(expected),
+    "Import verification failed. Your previous Media Log data was not reported as replaced.",
+  );
+  return actual;
+}
+
+async function replacePortableStorage(data) {
+  await browser.storage.local.set(data);
+  return verifyPortableStorage(data, await getPortableStorage());
+}
+
+function describeBackupCoverage(data) {
+  const history = data.history || [];
+  const historyWeeks = history.map((week) => week.weekNumber).sort((a, b) => a - b);
+  const sameYear = history.every((week) => week.year === data.currentWeek.year);
+  const historyLabel = sameYear && historyWeeks.length > 1
+    ? `Weeks ${historyWeeks[0]}-${historyWeeks.at(-1)}`
+    : `${history.length} archived weeks`;
+  const currentCount = data.currentWeek.entries.length;
+  return `Verified ${countBackupEntries(data)} entries. Archived ${historyLabel}; current Week ${data.currentWeek.weekNumber} has ${currentCount} entries.`;
+}
+
+function downloadJson(filename, value) {
+  const blob = new Blob([JSON.stringify(value, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
+function showBackupStatus(message, isError = false) {
+  const status = document.getElementById("backup-status");
+  status.textContent = message;
+  status.style.color = isError ? "var(--danger)" : "var(--accent)";
+}
+
+document.getElementById("btn-export-backup").addEventListener("click", async () => {
+  try {
+    const data = await getPortableStorage();
+    const backup = {
+      format: BACKUP_FORMAT,
+      version: BACKUP_VERSION,
+      exportedAt: new Date().toISOString(),
+      data: {
+        currentWeek: data.currentWeek,
+        history: data.history || [],
+        addDraft: data.addDraft,
+        userName: data.userName || "",
+        theme: THEMES.has(data.theme) ? data.theme : DEFAULT_THEME,
+      },
+    };
+    const date = backup.exportedAt.slice(0, 10);
+    downloadJson(`media-log-full-backup-${date}.json`, backup);
+    showBackupStatus(`Exported ${countBackupEntries(backup.data)} entries.`);
   } catch (error) {
-    showSyncStatus(getErrorMessage(error), true);
+    showBackupStatus(getErrorMessage(error), true);
   }
 });
 
-document.getElementById("sync-mode").addEventListener("change", (event) => {
-  updateSyncModeFields(event.target.value);
-});
+const backupFileInput = document.getElementById("backup-file");
 
-document.getElementById("btn-supabase-sign-in").addEventListener("click", async () => {
-  try {
-    const config = configForSave(getSyncConfigFromForm());
-    if (config.mode !== SYNC_MODES.SUPABASE) {
-      throw new Error("Switch sync mode to Supabase first.");
-    }
-
-    showSyncStatus("Signing in...");
-    const password = document.getElementById("sync-password").value;
-    const session = await signInWithSupabase(config, password);
-    await setStorage({ syncConfig: config });
-    document.getElementById("sync-password").value = "";
-    await restoreSyncSettings();
-    showSyncStatus(`Signed in${session.userEmail ? ` as ${session.userEmail}` : ""}.`);
-  } catch (error) {
-    showSyncStatus(getErrorMessage(error), true);
+document.getElementById("btn-import-backup").addEventListener("click", async () => {
+  if (!isTransferPage) {
+    await browser.tabs.create({ url: browser.runtime.getURL(TRANSFER_PAGE_PATH) });
+    return;
   }
+  backupFileInput.click();
 });
 
-document.getElementById("btn-supabase-sign-up").addEventListener("click", async () => {
+backupFileInput.addEventListener("change", async () => {
   try {
-    const config = configForSave(getSyncConfigFromForm());
-    if (config.mode !== SYNC_MODES.SUPABASE) {
-      throw new Error("Switch sync mode to Supabase first.");
-    }
+    const [file] = backupFileInput.files || [];
+    if (!file) return;
+    assertBackup(file.size <= MAX_BACKUP_BYTES, "Backup is larger than 10 MB.");
+    const data = validateBackup(JSON.parse(await file.text()));
 
-    showSyncStatus("Creating account...");
-    const password = document.getElementById("sync-password").value;
-    const session = await signUpWithSupabase(config, password);
-    await setStorage({ syncConfig: config });
-    document.getElementById("sync-password").value = "";
-    await restoreSyncSettings();
-    showSyncStatus(session ? `Signed up${session.userEmail ? ` as ${session.userEmail}` : ""}.` : "Account created. Check your email to confirm it, then sign in.");
+    await replacePortableStorage(data);
+    applyTheme(data.theme);
+    try {
+      localStorage.setItem("theme", data.theme);
+    } catch {}
+    document.getElementById("theme-select").value = data.theme;
+    document.getElementById("user-name").value = data.userName;
+    renderGreeting(data.userName);
+    await renderWeek();
+    await renderHistory();
+    await restoreAddDraft();
+    showBackupStatus(`${describeBackupCoverage(data)} You can close this tab and reopen Media Log.`);
   } catch (error) {
-    showSyncStatus(getErrorMessage(error), true);
-  }
-});
-
-document.getElementById("btn-supabase-reset").addEventListener("click", async () => {
-  try {
-    const config = configForSave(getSyncConfigFromForm());
-    if (config.mode !== SYNC_MODES.SUPABASE) {
-      throw new Error("Switch sync mode to Supabase first.");
-    }
-
-    showSyncStatus("Sending reset email...");
-    await requestSupabasePasswordReset(config);
-    await setStorage({ syncConfig: config });
-    document.getElementById("sync-password").value = "";
-    await restoreSyncSettings();
-    showSyncStatus("Password reset email sent.");
-  } catch (error) {
-    showSyncStatus(getErrorMessage(error), true);
-  }
-});
-
-document.getElementById("btn-supabase-sign-out").addEventListener("click", async () => {
-  try {
-    const data = await getStorage();
-    const config = data.syncConfig || configForSave(getSyncConfigFromForm());
-    await signOutOfSupabase(config, data.syncSession || null);
-    await restoreSyncSettings();
-    showSyncStatus("Signed out.");
-  } catch (error) {
-    showSyncStatus(getErrorMessage(error), true);
-  }
-});
-
-document.getElementById("btn-sync-unlock").addEventListener("click", async () => {
-  try {
-    const data = await getStorage();
-    const config = configForSave(getSyncConfigFromForm());
-    if (config.mode !== SYNC_MODES.SUPABASE) {
-      throw new Error("Switch sync mode to Supabase first.");
-    }
-
-    showSyncStatus("Opening checkout...");
-    await setStorage({ syncConfig: config });
-    const checkoutUrl = await createSyncUnlockCheckout(config, data.syncSession || null);
-    await restoreSyncSettings();
-    await openExternalUrl(checkoutUrl);
-    showSyncStatus("Checkout opened. Sync will unlock after payment.");
-  } catch (error) {
-    showSyncStatus(getErrorMessage(error), true);
-  }
-});
-
-document.getElementById("btn-sync-now").addEventListener("click", async () => {
-  try {
-    showSyncStatus("Syncing...");
-    const record = await syncNow();
-    const data = await getStorage();
-    renderSyncSummary(data);
-    showSyncStatus(`Synced revision ${record.revision}.`);
-  } catch (error) {
-    showSyncStatus(getErrorMessage(error), true);
-  }
-});
-
-document.getElementById("btn-prepare-migration").addEventListener("click", async () => {
-  try {
-    const report = await prepareLocalDataForSync();
-    const data = await getStorage();
-    renderSyncSummary(data);
-    showSyncStatus(formatMigrationReport(report));
-  } catch (error) {
-    showSyncStatus(getErrorMessage(error), true);
+    showBackupStatus(getErrorMessage(error), true);
+  } finally {
+    backupFileInput.value = "";
   }
 });
 
@@ -1939,6 +1471,13 @@ document.getElementById("btn-prepare-migration").addEventListener("click", async
 async function init() {
   await initTheme();
   await initUserName();
+
+  if (isTransferPage) {
+    document.body.classList.add("transfer-page");
+    switchTab("settings");
+    showBackupStatus("Select Import Backup, then choose the full backup file.");
+    return;
+  }
 
   const initialData = await ensureCurrentWeek();
   rolloverArchivedWeek = initialData.archivedWeek;
@@ -1949,7 +1488,6 @@ async function init() {
   }
 
   const restoredDraft = await restoreAddDraft();
-  await restoreSyncSettings();
   await prefillFromTab({ preserveDraftType: restoredDraft });
 }
 

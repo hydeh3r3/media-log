@@ -126,6 +126,7 @@
   <!-- History -->
   <section id="tab-history" class="tab-content">
     <div id="history-notice" class="history-notice" hidden></div>
+    <input type="search" id="history-search" class="history-search" placeholder="Search history" autocomplete="off" hidden>
     <div id="history-list"></div>
     <div id="history-empty" class="empty">No archived weeks yet.</div>
     <div id="history-publish-status" class="status"></div>
@@ -147,6 +148,16 @@
         <option value="nier">NieR: Automata</option>
       </select>
     </label>
+    <div class="data-transfer">
+      <h2>Data Transfer</h2>
+      <p>Move your current week, full history, draft, name, and theme between browsers.</p>
+      <div class="data-transfer-actions">
+        <button type="button" id="btn-export-backup">Export All Data</button>
+        <button type="button" id="btn-import-backup" class="secondary-action">Import Backup</button>
+      </div>
+      <input type="file" id="backup-file" accept="application/json,.json" hidden>
+      <div id="backup-status" class="status" role="status" aria-live="polite"></div>
+    </div>
   </section>
 
   <script src="popup.js"></script>
