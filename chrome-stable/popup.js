@@ -907,6 +907,7 @@ async function authRequest(config, grantType, body) {
     refreshToken: result.refresh_token,
     expiresAt: Date.now() + Math.max((result.expires_in || 3600) - 30, 1) * 1000,
     userEmail: result.user?.email || config.email || "",
+    supabaseUrl,
   };
 }
 
@@ -929,7 +930,7 @@ async function authActionRequest(config, path, body) {
   return result;
 }
 
-function sessionFromAuthResult(result, fallbackEmail) {
+function sessionFromAuthResult(result, fallbackEmail, supabaseUrl) {
   const tokenResult = result.session?.access_token ? result.session : result;
   if (!tokenResult.access_token || !tokenResult.refresh_token) {
     return null;
@@ -940,6 +941,7 @@ function sessionFromAuthResult(result, fallbackEmail) {
     refreshToken: tokenResult.refresh_token,
     expiresAt: Date.now() + Math.max((tokenResult.expires_in || 3600) - 30, 1) * 1000,
     userEmail: tokenResult.user?.email || result.user?.email || fallbackEmail || "",
+    supabaseUrl,
   };
 }
 
@@ -975,7 +977,7 @@ async function signUpWithSupabase(config, password) {
     email: config.email,
     password,
   });
-  const session = sessionFromAuthResult(result, config.email);
+  const session = sessionFromAuthResult(result, config.email, normalizeSupabaseUrl(config.supabaseUrl));
   if (session) {
     await setStorage({ syncSession: session });
   }
@@ -1012,15 +1014,26 @@ async function refreshSupabaseSession(config, session) {
 async function signOutOfSupabase(config, session) {
   if (session?.accessToken && config.supabaseUrl && config.supabaseAnonKey) {
     const supabaseUrl = normalizeSupabaseUrl(config.supabaseUrl);
-    await fetch(`${supabaseUrl}/auth/v1/logout`, {
-      method: "POST",
-      headers: {
-        apikey: config.supabaseAnonKey,
-        Authorization: `Bearer ${session.accessToken}`,
-      },
-    }).catch(() => {});
+    // Only the project that issued the session gets its token, even to sign out.
+    if (session.supabaseUrl === supabaseUrl) {
+      await fetch(`${supabaseUrl}/auth/v1/logout`, {
+        method: "POST",
+        headers: {
+          apikey: config.supabaseAnonKey,
+          Authorization: `Bearer ${session.accessToken}`,
+        },
+      }).catch(() => {});
+    }
   }
   await setStorage({ syncSession: null });
+}
+
+// Sessions saved before they recorded their project belong to the Supabase URL saved with them.
+async function tagLegacySyncSession() {
+  const { syncConfig, syncSession } = await getStorage();
+  if (syncSession && !syncSession.supabaseUrl && syncConfig?.supabaseUrl) {
+    await setStorage({ syncSession: { ...syncSession, supabaseUrl: syncConfig.supabaseUrl } });
+  }
 }
 
 async function getSyncAuth(config, storedSession) {
@@ -1038,6 +1051,12 @@ async function getSyncAuth(config, storedSession) {
 
   if (!config.supabaseUrl || !config.supabaseAnonKey) {
     throw new Error("Supabase URL and publishable key are required.");
+  }
+
+  // A session's tokens only go back to the Supabase project that issued them.
+  if (storedSession && storedSession.supabaseUrl !== normalizeSupabaseUrl(config.supabaseUrl)) {
+    await setStorage({ syncSession: null });
+    throw new Error("Sign in to Supabase again for this project.");
   }
 
   const session = storedSession?.accessToken && storedSession.expiresAt > Date.now() + TOKEN_REFRESH_MARGIN_MS
@@ -1986,6 +2005,7 @@ document.getElementById("btn-prepare-migration").addEventListener("click", async
 // --- Init ---
 
 async function init() {
+  await tagLegacySyncSession();
   await initTheme();
   await initUserName();
 

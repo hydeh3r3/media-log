@@ -82,6 +82,7 @@ The deployable Supabase files live in:
 
 - `supabase/migrations/20260526173000_create_media_log_records.sql`
 - `supabase/migrations/20260527031500_create_media_log_sync_entitlements.sql`
+- `supabase/migrations/20261001120000_restrict_media_log_records_to_sync_function.sql`
 - `supabase/functions/media-log-sync/index.ts`
 - `supabase/functions/media-log-checkout/index.ts`
 - `supabase/functions/media-log-stripe-webhook/index.ts`

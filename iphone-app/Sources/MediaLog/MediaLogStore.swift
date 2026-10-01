@@ -99,6 +99,10 @@ final class MediaLogStore {
     }
 
     func saveSyncConfig(_ config: SyncConfig, localToken: String? = nil) {
+        // A Supabase session belongs to the project that issued it, so another project needs a new sign-in.
+        if Self.supabaseOrigin(config.supabaseUrl) != Self.supabaseOrigin(syncConfig.supabaseUrl) {
+            clearSupabaseSession()
+        }
         syncConfig = config
         if let localToken {
             syncCredential.localToken = localToken
@@ -155,10 +159,7 @@ final class MediaLogStore {
         if !syncCredential.accessToken.isEmpty {
             try? await SupabaseAuthClient(config: syncConfig).signOut(accessToken: syncCredential.accessToken)
         }
-        syncCredential.accessToken = ""
-        syncCredential.refreshToken = ""
-        syncCredential.expiresAt = nil
-        syncCredential.userEmail = ""
+        clearSupabaseSession()
         saveCredential()
         syncStatus = "Signed out."
         save()
@@ -240,6 +241,19 @@ final class MediaLogStore {
         } catch {
             syncStatus = error.localizedDescription
         }
+    }
+
+    private func clearSupabaseSession() {
+        syncCredential.accessToken = ""
+        syncCredential.refreshToken = ""
+        syncCredential.expiresAt = nil
+        syncCredential.userEmail = ""
+    }
+
+    /// The scheme and host that Supabase requests are sent to.
+    private static func supabaseOrigin(_ value: String) -> String? {
+        guard let url = URL(string: value), let host = url.host else { return nil }
+        return "\(url.scheme?.lowercased() ?? "https")://\(host.lowercased())"
     }
 
     private func ensureCurrentWeek() {

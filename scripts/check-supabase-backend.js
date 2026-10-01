@@ -1,9 +1,10 @@
-import { readFile } from "node:fs/promises";
+import { readdir, readFile } from "node:fs/promises";
 
 const REQUIRED_FILES = [
   "supabase/config.toml",
   "supabase/migrations/20260526173000_create_media_log_records.sql",
   "supabase/migrations/20260527031500_create_media_log_sync_entitlements.sql",
+  "supabase/migrations/20261001120000_restrict_media_log_records_to_sync_function.sql",
   "supabase/functions/_shared/stripe-webhook.ts",
   "supabase/functions/media-log-sync/index.ts",
   "supabase/functions/media-log-checkout/index.ts",
@@ -58,6 +59,21 @@ assert(migrations.includes("media_log_sync_entitlements"), "Migration must defin
 assert(migrations.includes("price_cents = 200"), "Sync entitlement price must be locked to 200 cents.");
 assert(migrations.includes("Users can read their sync entitlement"), "Users must be able to read only their own sync entitlement.");
 
+// Sync rows must only be reachable through the Edge Function, which checks the paid entitlement.
+const migrationNames = (await readdir(new URL("../supabase/migrations/", import.meta.url))).filter((name) => name.endsWith(".sql")).sort();
+const allMigrations = (await Promise.all(migrationNames.map((name) => read(`supabase/migrations/${name}`)))).join("\n");
+for (const [, policy] of allMigrations.matchAll(/create policy "([^"]+)"\s+on public\.media_log_records/g)) {
+  assert(
+    allMigrations.lastIndexOf(`drop policy if exists "${policy}" on public.media_log_records`) >
+      allMigrations.lastIndexOf(`create policy "${policy}"`),
+    `Policy "${policy}" lets clients skip the paid sync check on media_log_records.`,
+  );
+}
+assert(
+  allMigrations.includes("revoke all on table public.media_log_records from anon, authenticated"),
+  "Clients must not hold table privileges on media_log_records.",
+);
+
 const functionSource = await read("supabase/functions/media-log-sync/index.ts");
 const transpiledFunction = new Bun.Transpiler({ loader: "ts" }).transformSync(functionSource);
 new Function(transpiledFunction);
@@ -94,6 +110,8 @@ assert(
   webhookCombinedSource.includes("checkout.session.async_payment_succeeded"),
   "Webhook function must handle delayed payment success.",
 );
+assert(webhookCombinedSource.includes("charge.refunded"), "Webhook function must revoke sync after a full refund.");
+assert(webhookCombinedSource.includes("charge.dispute.closed"), "Webhook function must revoke sync after a lost chargeback.");
 assert(webhookSource.includes("media_log_sync_entitlements"), "Webhook function must write sync entitlements.");
 assert(webhookSource.includes("price_cents") && webhookSource.includes("200"), "Webhook entitlement price must be $2.");
 assert(!/whsec_[A-Za-z0-9]+/.test(webhookCombinedSource), "Webhook function must not contain a Stripe webhook secret.");

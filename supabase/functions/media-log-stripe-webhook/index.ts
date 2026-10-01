@@ -1,6 +1,7 @@
 import {
   StripeWebhookError,
   entitlementUserId,
+  revokedPaymentIntent,
   shouldUnlockSync,
   verifyStripeEvent,
   type StripeCheckoutSession,
@@ -109,6 +110,28 @@ async function upsertEntitlement(env: Env, session: StripeCheckoutSession): Prom
   }
 }
 
+async function revokeEntitlement(env: Env, paymentIntent: string): Promise<void> {
+  const response = await fetch(
+    `${env.supabaseUrl}/rest/v1/media_log_sync_entitlements?provider_payment_id=eq.${encodeURIComponent(paymentIntent)}`,
+    {
+      method: "PATCH",
+      headers: {
+        apikey: env.secretKey,
+        Authorization: `Bearer ${env.secretKey}`,
+        "Content-Type": "application/json",
+        Prefer: "return=minimal",
+      },
+      body: JSON.stringify({ status: "canceled" }),
+    },
+  );
+
+  if (!response.ok) {
+    const detail = await response.text();
+    console.error("Supabase entitlement revoke error", response.status, detail);
+    throw httpError(502, "Entitlement update failed.");
+  }
+}
+
 async function handleRequest(request: Request): Promise<Response> {
   if (request.method !== "POST") {
     return jsonResponse({ ok: false, error: "Method not allowed" }, 405);
@@ -120,6 +143,11 @@ async function handleRequest(request: Request): Promise<Response> {
 
   if (shouldUnlockSync(event)) {
     await upsertEntitlement(env, event.data!.object!);
+  }
+
+  const revokedPayment = revokedPaymentIntent(event);
+  if (revokedPayment) {
+    await revokeEntitlement(env, revokedPayment);
   }
 
   return jsonResponse({ ok: true, received: true });

@@ -134,7 +134,7 @@ bun run check:migration
 ## Safety Notes
 
 - Row-level security is enabled on `media_log_records`.
-- Users can only read or write their own row.
+- Clients cannot read or write `media_log_records` directly. Only the Edge Function can, after it checks the sync entitlement.
 - Row-level security is enabled on `media_log_sync_entitlements`.
 - Users can read their own sync entitlement.
 - The Edge Function validates the bearer token.

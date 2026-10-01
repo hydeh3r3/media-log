@@ -4,8 +4,14 @@ export type StripeEvent = {
   id?: string;
   type?: string;
   data?: {
-    object?: StripeCheckoutSession;
+    object?: StripeCheckoutSession & StripePaymentReversal;
   };
+};
+
+// Refunded charges and closed disputes point back to the paid PaymentIntent too.
+export type StripePaymentReversal = {
+  refunded?: boolean;
+  status?: string | null;
 };
 
 export type StripeCheckoutSession = {
@@ -118,6 +124,15 @@ export function shouldUnlockSync(event: StripeEvent): boolean {
       session.amount_total === 200 &&
       session.currency === "usd",
   );
+}
+
+// A full refund or a lost chargeback takes the sync unlock back.
+export function revokedPaymentIntent(event: StripeEvent): string | null {
+  const object = event.data?.object;
+  const reversed =
+    (event.type === "charge.refunded" && object?.refunded === true) ||
+    (event.type === "charge.dispute.closed" && object?.status === "lost");
+  return reversed && object?.payment_intent ? object.payment_intent : null;
 }
 
 export function entitlementUserId(session: StripeCheckoutSession): string {

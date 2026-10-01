@@ -182,7 +182,10 @@ async function loadPopupMigration(sourcePath, apiName) {
     return {
       formatMigrationReport,
       getStorage,
+      getSyncAuth,
       prepareLocalDataForSync,
+      signOutOfSupabase,
+      tagLegacySyncSession,
     };
   `);
 
@@ -242,6 +245,50 @@ async function runPopupMigrationSmokeTest(label, sourcePath, apiName) {
   }
 }
 
-await runPopupMigrationSmokeTest("Chrome", `${ROOT}/chrome-stable/popup.js`, "chrome");
+async function runSessionBindingSmokeTest(sourcePath, apiName) {
+  const { api, cleanup, storage } = await loadPopupMigration(sourcePath, apiName);
+  const previousFetch = globalThis.fetch;
+  const requests = [];
+  globalThis.fetch = async (url, options = {}) => {
+    requests.push({ authorization: options.headers?.Authorization || "", url: String(url) });
+    return new Response("{}");
+  };
+  const projectA = "https://project-a.supabase.co";
+  const projectB = "https://project-b.supabase.co";
+  const config = (supabaseUrl) => ({ mode: "supabase", supabaseAnonKey: "synthetic-publishable-key", supabaseUrl });
+  const session = {
+    accessToken: "synthetic-access-token",
+    expiresAt: Date.now() + 3_600_000,
+    refreshToken: "synthetic-refresh-token",
+    supabaseUrl: projectA,
+    userEmail: "",
+  };
 
-console.log("Chrome Stable migration smoke test passed with count-only reports.");
+  try {
+    const auth = await api.getSyncAuth(config(projectA), session);
+    assert(auth.token === session.accessToken && auth.endpoint.startsWith(projectA), "A session should work with its own project.");
+
+    const otherProject = await api.getSyncAuth(config(projectB), session).then(() => "used", () => "rejected");
+    assert(otherProject === "rejected", "A session must not be used with another Supabase project.");
+    assert(storage.syncSession === null, "A session for another project should be cleared.");
+
+    await api.signOutOfSupabase(config(projectB), session);
+    assert(requests.length === 0, "Signing out must not send the token to another project.");
+    await api.signOutOfSupabase(config(projectA), session);
+    assert(requests.length === 1 && requests[0].url.startsWith(projectA), "Signing out should reach the issuing project.");
+
+    const { supabaseUrl: _unused, ...legacySession } = session;
+    storage.syncConfig = config(projectA);
+    storage.syncSession = legacySession;
+    await api.tagLegacySyncSession();
+    assert(storage.syncSession.supabaseUrl === projectA, "Older saved sessions should belong to the saved project.");
+  } finally {
+    globalThis.fetch = previousFetch;
+    cleanup();
+  }
+}
+
+await runPopupMigrationSmokeTest("Chrome", `${ROOT}/chrome-stable/popup.js`, "chrome");
+await runSessionBindingSmokeTest(`${ROOT}/chrome-stable/popup.js`, "chrome");
+
+console.log("Chrome Stable migration smoke test passed with count-only reports and project-bound sessions.");

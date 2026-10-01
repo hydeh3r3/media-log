@@ -82,8 +82,12 @@ Handled events:
 
 - `checkout.session.completed`
 - `checkout.session.async_payment_succeeded`
+- `charge.refunded`
+- `charge.dispute.closed`
 
 After payment succeeds, the webhook upserts the PostgreSQL entitlement row.
+
+After a full refund, or a chargeback you lose, the webhook sets that row's `status` to `canceled`. Select all four events on the Stripe webhook endpoint.
 
 ## Required Secrets
 

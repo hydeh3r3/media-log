@@ -6,14 +6,19 @@ const DATA_PATH = process.env.MEDIA_LOG_SYNC_DATA_PATH || join(ROOT, ".local-syn
 const HOST = process.env.MEDIA_LOG_SYNC_HOST || "127.0.0.1";
 const PORT = Number.parseInt(process.env.MEDIA_LOG_SYNC_PORT || "43189", 10);
 const DEV_TOKEN = process.env.MEDIA_LOG_SYNC_TOKEN || "dev-media-log-token";
+// Browsers send the page's host name. Allowing only localhost and IP addresses blocks DNS rebinding.
+const LOCAL_HOST_HEADER = /^(?:localhost|\d{1,3}(?:\.\d{1,3}){3}|\[[\da-f:.]+\])(?::\d+)?$/i;
 
+if (!process.env.MEDIA_LOG_SYNC_TOKEN && !["127.0.0.1", "localhost", "::1"].includes(HOST)) {
+  console.error("Set MEDIA_LOG_SYNC_TOKEN before listening beyond this computer.");
+  process.exit(1);
+}
+
+// No CORS headers: extension pages with host permission don't need them, and web pages must not read sync data.
 function jsonResponse(body, status = 200) {
   return new Response(JSON.stringify(body, null, 2), {
     status,
     headers: {
-      "Access-Control-Allow-Headers": "authorization, content-type",
-      "Access-Control-Allow-Methods": "GET, PUT, OPTIONS",
-      "Access-Control-Allow-Origin": "*",
       "Content-Type": "application/json",
     },
   });
@@ -164,6 +169,10 @@ Bun.serve({
   port: PORT,
   async fetch(request) {
     const url = new URL(request.url);
+
+    if (!LOCAL_HOST_HEADER.test(request.headers.get("host") || "")) {
+      return jsonResponse({ ok: false, error: "Forbidden host" }, 403);
+    }
 
     if (request.method === "OPTIONS") {
       return jsonResponse({ ok: true });

@@ -161,6 +161,16 @@ async function runSmokeTest() {
     const unauthorized = await fetch(`${baseUrl}/v1/media-log?userId=${USER_ID}`);
     assert(unauthorized.status === 401, "Dev sync server should reject missing bearer tokens.");
 
+    const rebound = await fetch(`${baseUrl}/v1/media-log?userId=${USER_ID}`, {
+      headers: { authorization: `Bearer ${DEV_TOKEN}`, host: "rebind.example" },
+    });
+    assert(rebound.status === 403, "Dev sync server should reject host names that could be DNS rebinding.");
+
+    const crossSite = await fetch(`${baseUrl}/v1/media-log?userId=${USER_ID}`, {
+      headers: { authorization: `Bearer ${DEV_TOKEN}`, origin: "https://example.com" },
+    });
+    assert(!crossSite.headers.has("access-control-allow-origin"), "Dev sync server must not let web pages read sync data.");
+
     const headers = {
       authorization: `Bearer ${DEV_TOKEN}`,
       "content-type": "application/json",
@@ -229,4 +239,28 @@ async function runSmokeTest() {
   }
 }
 
+async function assertRefusesNetworkHostWithDefaultToken() {
+  const env = Object.fromEntries(
+    Object.entries(process.env).filter(([name, value]) => value !== undefined && name !== "MEDIA_LOG_SYNC_TOKEN"),
+  );
+  // 192.0.2.1 is a documentation-only address, so even a broken guard cannot expose the server.
+  const server = Bun.spawn(["bun", "run", "scripts/sync-dev-server.js"], {
+    cwd: ROOT,
+    env: { ...env, MEDIA_LOG_SYNC_HOST: "192.0.2.1" },
+    stderr: "pipe",
+    stdout: "pipe",
+  });
+  const exited = await Promise.race([server.exited.then(() => true), sleep(5000).then(() => false)]);
+  if (!exited) {
+    await stopServer(server);
+  }
+  const stderr = await new Response(server.stderr).text();
+  assert(
+    exited && server.exitCode !== 0 && stderr.includes("Set MEDIA_LOG_SYNC_TOKEN"),
+    "Dev sync server must not listen beyond this computer with the default token.",
+  );
+  console.log("Dev sync server refuses to listen beyond this computer with the default token.");
+}
+
 await runSmokeTest();
+await assertRefusesNetworkHostWithDefaultToken();

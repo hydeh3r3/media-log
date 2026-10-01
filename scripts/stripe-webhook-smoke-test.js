@@ -2,6 +2,7 @@ import { createHmac } from "node:crypto";
 import {
   StripeWebhookError,
   entitlementUserId,
+  revokedPaymentIntent,
   shouldUnlockSync,
   verifyStripeEvent,
 } from "../supabase/functions/_shared/stripe-webhook.ts";
@@ -93,5 +94,26 @@ await assertRejectsStripeWebhook(
   () => Promise.resolve(entitlementUserId({ ...paidSession, metadata: { media_log_user_id: "not-a-user-id" } })),
   "valid Media Log user ID",
 );
+
+const refundedCharge = { id: "ch_safe_media_log_sync", payment_intent: paidSession.payment_intent, refunded: true };
+const lostDispute = { id: "dp_safe_media_log_sync", payment_intent: paidSession.payment_intent, status: "lost" };
+
+assert(
+  revokedPaymentIntent({ type: "charge.refunded", data: { object: refundedCharge } }) === paidSession.payment_intent,
+  "A full refund should revoke the sync unlock.",
+);
+assert(
+  revokedPaymentIntent({ type: "charge.refunded", data: { object: { ...refundedCharge, refunded: false } } }) === null,
+  "A partial refund must not revoke the sync unlock.",
+);
+assert(
+  revokedPaymentIntent({ type: "charge.dispute.closed", data: { object: lostDispute } }) === paidSession.payment_intent,
+  "A lost chargeback should revoke the sync unlock.",
+);
+assert(
+  revokedPaymentIntent({ type: "charge.dispute.closed", data: { object: { ...lostDispute, status: "won" } } }) === null,
+  "A won chargeback must not revoke the sync unlock.",
+);
+assert(revokedPaymentIntent(event) === null, "A completed checkout must not revoke the sync unlock.");
 
 console.log("Stripe webhook smoke test passed with safe synthetic events.");
