@@ -20,6 +20,7 @@ Media Log may handle:
 
 - media entries written by the user
 - active tab title and URL when the user saves the current page
+- page headings and media details used to fill a new entry
 - Supabase account email
 - Supabase session tokens
 - local dev sync token, if the user enters one
@@ -67,6 +68,9 @@ Media Log sends data only when needed for a user-chosen feature:
 - Supabase receives account and media log data for production sync.
 - Stripe receives checkout data for the optional `$2` sync unlock.
 - A local dev sync endpoint receives media log data only when the user enters that endpoint.
+- On iOS, entering a URL in a new entry sends a page request to that website to find its media type. The site sees the requested URL and normal connection details, such as the device's IP address. The lookup uses no saved cookies and does not run page scripts. Titles remain manually entered.
+
+Media-type rules run on the device. Page content is not sent to an AI service.
 
 ## Security
 

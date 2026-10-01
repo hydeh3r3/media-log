@@ -5,10 +5,16 @@ struct EntryEditorView: View {
     @Environment(\.medialogTheme) private var theme
     @Bindable var store: MediaLogStore
     @State private var entry: MediaEntry
+    @State private var metadataStatus = ""
+    @State private var lastSuggestedType: EntryType?
+    @State private var manuallySelectedType = false
+    @State private var lookupAttempt = 0
+    private let isNewEntry: Bool
 
     init(store: MediaLogStore, entry: MediaEntry) {
         self.store = store
         _entry = State(initialValue: entry)
+        isNewEntry = entry.title.isEmpty
     }
 
     var body: some View {
@@ -20,10 +26,24 @@ struct EntryEditorView: View {
                         get: { entry.url ?? "" },
                         set: { entry.url = $0.isEmpty ? nil : $0 }
                     ))
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
+                    .keyboardType(.URL)
                     Picker("Type", selection: $entry.type) {
                         ForEach(EntryType.allCases) { type in
                             Text(type.label).tag(type)
                         }
+                    }
+                    .onChange(of: entry.type) { _, newValue in
+                        if newValue != lastSuggestedType { manuallySelectedType = true }
+                    }
+                    if isNewEntry && !(entry.url ?? "").isEmpty {
+                        if !metadataStatus.isEmpty {
+                            Text(metadataStatus)
+                                .font(.footnote)
+                                .foregroundStyle(theme.muted)
+                        }
+                        Button("Find type") { lookupAttempt += 1 }
                     }
                     TextField("Date", text: $entry.date)
                     Stepper(value: ratingBinding, in: 0...10) {
@@ -38,6 +58,9 @@ struct EntryEditorView: View {
             .scrollContentBackground(.hidden)
             .background(theme.bg)
             .navigationTitle(entry.title.isEmpty ? "New Entry" : "Edit Entry")
+            .task(id: "\(entry.url ?? "")|\(lookupAttempt)") {
+                await fillMetadata()
+            }
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") {
@@ -51,6 +74,36 @@ struct EntryEditorView: View {
                     .disabled(entry.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 }
             }
+        }
+    }
+
+    /// Suggests a type for the current URL. Titles remain manually entered.
+    @MainActor
+    private func fillMetadata() async {
+        guard isNewEntry else { return }
+        let rawURL = (entry.url ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !rawURL.isEmpty else { metadataStatus = ""; return }
+        let originalType = entry.type
+        do {
+            try await Task.sleep(for: .milliseconds(500))
+            metadataStatus = "Finding media type…"
+            let suggestion = try await MediaMetadataLookup.fetch(rawURL)
+            try Task.checkCancellation()
+            guard rawURL == (entry.url ?? "").trimmingCharacters(in: .whitespacesAndNewlines) else { return }
+            if !manuallySelectedType, entry.type == originalType, let rawType = suggestion.type, let type = EntryType(rawValue: rawType) {
+                lastSuggestedType = type
+                entry.type = type
+            }
+            if !suggestion.pageLoaded {
+                metadataStatus = "Could not read this page. Check the type."
+            } else {
+                metadataStatus = ""
+            }
+        } catch is CancellationError {
+            return
+        } catch {
+            guard !Task.isCancelled else { return }
+            metadataStatus = "Enter a full web URL to find its media type."
         }
     }
 

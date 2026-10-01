@@ -10,6 +10,8 @@ bun run verify
 
 That command checks the Chrome package, Firefox source and lint, Chrome Nightly parity, Supabase backend files, safe migration flow, Stripe webhook rules, local sync merge flow, iOS simulator build, and iOS release readiness.
 
+It also checks the shared title and type rules across the browser builds. See [Media Detection and Title Capture](media-detection-notes.md) for examples and how to try the changes.
+
 ## Chrome Development Install
 
 Load this folder:
@@ -79,6 +81,8 @@ Steps:
 5. Open the Media Log toolbar button.
 
 Temporary add-ons unload when Zen restarts. Reload the manifest from `about:debugging` after a restart. Media Log data stays in the Zen profile.
+
+If a pinned Media Log button expands the sidebar, see the [Zen sidebar fix](zen-sidebar-fix.md). This is a Zen toolbar style issue, not popup CSS.
 
 To move all Chrome Nightly data into Zen:
 

@@ -1,0 +1,25 @@
+/* Keep Media Log compact when Zen leaves menu classes on a pinned button.
+ * Scope by real location, not toolbarbutton-1 or overflowedItem state.
+ * Full extension menus and other add-ons are not affected.
+ */
+:root[windowtype="navigator:browser"]
+  :is(toolbar, #zen-overflow-extensions-list)
+  #media-log_wetbrain_local-browser-action:not(panel *, panelview *, menupopup *) {
+  .unified-extensions-item-contents,
+  .unified-extensions-item-menu-button {
+    display: none !important;
+  }
+
+  .unified-extensions-item-row-wrapper {
+    align-items: center !important;
+  }
+
+  .unified-extensions-item-action-button > .toolbarbutton-badge-stack {
+    margin-inline-end: 0 !important;
+  }
+
+  .unified-extensions-item-action-button > .toolbarbutton-badge-stack > .toolbarbutton-icon {
+    width: 16px !important;
+    height: 16px !important;
+  }
+}

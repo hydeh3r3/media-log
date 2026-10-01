@@ -13,8 +13,9 @@ const expectedEntries = [
   "popup.css",
   "popup.html",
   "popup.js",
+  "media-metadata.js",
 ];
-const textEntries = ["manifest.json", "popup.css", "popup.html", "popup.js"];
+const textEntries = ["manifest.json", "popup.css", "popup.html", "popup.js", "media-metadata.js"];
 const blockedPackagePatterns = [
   ".DS_Store",
   "__MACOSX/",

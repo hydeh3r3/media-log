@@ -158,338 +158,18 @@ function normalizeSelectableType(type) {
   return SELECTABLE_ENTRY_TYPES.has(type) ? type : DEFAULT_ENTRY_TYPE;
 }
 
-function addTypeScore(scores, type, points) {
-  scores[type] = (scores[type] || 0) + points;
-}
-
-function includesAny(value, needles) {
-  return needles.some((needle) => value.includes(needle));
-}
-
-// Runs inside the inspected page (serialized via chrome.scripting). Keep it
-// self-contained: it may only reference page globals, never popup.js scope.
-function collectPageSignals() {
-  const result = {
-    ogType: "",
-    twitterCard: "",
-    siteName: "",
-    ldTypes: [],
-    metaPrefixes: [],
-    bodyTextLength: 0,
-  };
-
-  const getMeta = (selector) => {
-    const el = document.querySelector(selector);
-    return el ? (el.getAttribute("content") || "").trim() : "";
-  };
-
-  result.ogType = getMeta('meta[property="og:type"]').toLowerCase();
-  result.twitterCard = getMeta('meta[name="twitter:card"]').toLowerCase();
-  result.siteName = getMeta('meta[property="og:site_name"]').toLowerCase();
-
-  // Prefixed OG meta groups (article:, book:, music:, video:) signal a category.
-  const prefixes = new Set();
-  for (const meta of document.querySelectorAll("meta[property]")) {
-    const prop = (meta.getAttribute("property") || "").toLowerCase();
-    const colon = prop.indexOf(":");
-    if (colon > 0) prefixes.add(prop.slice(0, colon));
-  }
-  result.metaPrefixes = [...prefixes];
-
-  // JSON-LD structured data: collect every schema.org @type on the page.
-  const types = new Set();
-  const pushType = (value) => {
-    if (Array.isArray(value)) {
-      for (const v of value) pushType(v);
-    } else if (typeof value === "string") {
-      types.add(value.toLowerCase());
-    }
-  };
-  const walk = (node) => {
-    if (!node || typeof node !== "object") return;
-    if (Array.isArray(node)) {
-      for (const item of node) walk(item);
-      return;
-    }
-    if (node["@type"]) pushType(node["@type"]);
-    if (node["@graph"]) walk(node["@graph"]);
-  };
-  for (const script of document.querySelectorAll('script[type="application/ld+json"]')) {
-    try {
-      walk(JSON.parse(script.textContent));
-    } catch {
-      // Ignore malformed JSON-LD.
-    }
-  }
-  result.ldTypes = [...types];
-
-  // Long-form reading content hints toward an article.
-  const article = document.querySelector("article");
-  const text = article ? article.textContent : document.body?.innerText;
-  result.bodyTextLength = (text || "").trim().length;
-
-  return result;
-}
-
-// Extracts structured signals from the active tab. Requires the activeTab
-// grant (the popup opening counts as the user gesture). Returns null on
-// restricted pages (chrome://, web store, PDFs) so callers fall back to URL.
+// Read page metadata in the extension isolated world.
 async function extractPageSignals(tabId) {
-  if (typeof tabId !== "number" || !chrome.scripting?.executeScript) {
-    return null;
-  }
+  if (typeof tabId !== "number" || !chrome.scripting?.executeScript) return null;
   try {
     const [injection] = await chrome.scripting.executeScript({
       target: { tabId },
-      func: collectPageSignals,
+      func: MediaLogMetadata.collectPageSignals,
     });
     return injection?.result || null;
   } catch {
     return null;
   }
-}
-
-// Folds page metadata into the type scores. Structured declarations outrank
-// URL/title heuristics, so they carry higher weights.
-function scorePageSignals(scores, signals) {
-  if (!signals) return;
-
-  const ldTypeMap = {
-    movie: "film",
-    tvseries: "tv",
-    tvseason: "tv",
-    tvepisode: "tv",
-    book: "book",
-    audiobook: "book",
-    musicrecording: "music",
-    musicalbum: "music",
-    musicgroup: "music",
-    musicplaylist: "music",
-    videogame: "game",
-    podcastepisode: "podcast",
-    podcastseries: "podcast",
-    article: "article",
-    newsarticle: "article",
-    blogposting: "article",
-    scholarlyarticle: "article",
-    report: "article",
-    comicseries: "manga",
-    comicstory: "manga",
-  };
-  for (const ldType of signals.ldTypes || []) {
-    const mapped = ldTypeMap[ldType];
-    if (mapped) addTypeScore(scores, mapped, 14);
-  }
-
-  const ogTypeMap = {
-    "video.movie": "film",
-    "video.tv_show": "tv",
-    "video.episode": "tv",
-    "music.song": "music",
-    "music.album": "music",
-    "music.playlist": "music",
-    book: "book",
-    "books.book": "book",
-    article: "article",
-  };
-  const mappedOg = ogTypeMap[signals.ogType];
-  if (mappedOg) addTypeScore(scores, mappedOg, 12);
-
-  for (const prefix of signals.metaPrefixes || []) {
-    if (prefix === "article") addTypeScore(scores, "article", 6);
-    else if (prefix === "book") addTypeScore(scores, "book", 5);
-    else if (prefix === "music") addTypeScore(scores, "music", 5);
-  }
-
-  // Substantial body text nudges toward article when nothing else dominates.
-  if ((signals.bodyTextLength || 0) > 2500) {
-    addTypeScore(scores, "article", 3);
-  }
-}
-
-function inferTypeFromTab(tab, pageSignals = null) {
-  const rawUrl = tab.url || "";
-  const rawTitle = tab.title || "";
-
-  let parsedUrl;
-  try {
-    parsedUrl = new URL(rawUrl);
-  } catch {
-    return null;
-  }
-
-  if (!["http:", "https:"].includes(parsedUrl.protocol)) {
-    return null;
-  }
-
-  const host = parsedUrl.hostname.toLowerCase();
-  const path = parsedUrl.pathname.toLowerCase();
-  const query = parsedUrl.search.toLowerCase();
-  const title = rawTitle.toLowerCase();
-  const combined = `${host} ${path} ${query} ${title}`;
-  const scores = {};
-
-  if (host.includes("substack.com")) {
-    addTypeScore(scores, "article", 10);
-  }
-
-  if (
-    host.includes("mangadex") ||
-    host.includes("mangaplus") ||
-    host.includes("mangafire") ||
-    host.includes("mangafreak.me") ||
-    host.includes("manga4life") ||
-    host.includes("manganato") ||
-    host.includes("comick.") ||
-    host.includes("comick.dev") ||
-    host.includes("webtoons.")
-  ) {
-    addTypeScore(scores, "manga", 10);
-  }
-
-  if (host.includes("myanimelist.net")) {
-    if (path.startsWith("/manga/")) addTypeScore(scores, "manga", 10);
-    if (path.startsWith("/anime/")) addTypeScore(scores, "anime", 10);
-  }
-
-  if (host.includes("anilist.co")) {
-    if (path.startsWith("/manga/")) addTypeScore(scores, "manga", 10);
-    if (path.startsWith("/anime/")) addTypeScore(scores, "anime", 10);
-  }
-
-  if (
-    /(^|[\s/:-])(chapter|ch\.?)\s*\d+/i.test(rawTitle) ||
-    path.includes("/chapter-") ||
-    path.includes("/chapter/") ||
-    /\b(manga|manhwa|manhua|webtoon)\b/.test(combined)
-  ) {
-    addTypeScore(scores, "manga", 4);
-  }
-
-  if (
-    host.includes("crunchyroll.com") ||
-    host.includes("animepahe.com") ||
-    host.includes("animepahe.pw") ||
-    host.includes("anikoto.com") ||
-    host.includes("anikototv.to") ||
-    host.includes("hidive.com") ||
-    host.includes("funimation.com")
-  ) {
-    addTypeScore(scores, "anime", 10);
-  }
-
-  if (path.includes("/watch/") || /\bs\d{1,2}e\d{1,3}\b/.test(title) || /\bepisode\b/.test(title)) {
-    addTypeScore(scores, "anime", 3);
-    addTypeScore(scores, "tv", 2);
-  }
-
-  if (host.includes("letterboxd.com")) {
-    addTypeScore(scores, "film", 10);
-  }
-
-  if (host.includes("imdb.com") || host.includes("themoviedb.org") || host.includes("trakt.tv")) {
-    if (/\bseason\b|\bseries\b|\bepisode\b|\bs\d{1,2}e\d{1,3}\b/.test(title)) {
-      addTypeScore(scores, "tv", 7);
-    } else {
-      addTypeScore(scores, "film", 7);
-      addTypeScore(scores, "tv", 3);
-    }
-  }
-
-  if (host.includes("open.spotify.com") || host.includes("podcasts.apple.com") || host.includes("overcast.fm")) {
-    if (path.includes("/episode/") || path.includes("/show/") || /\bpodcast\b/.test(title)) {
-      addTypeScore(scores, "podcast", 10);
-    } else {
-      addTypeScore(scores, "music", 10);
-    }
-  }
-
-  if (host.includes("youtube.com") || host.includes("youtu.be")) {
-    addTypeScore(scores, "podcast", 10);
-    if (/\b(official audio|official video|music video|lyrics|album|single|soundtrack|ost)\b/.test(title)) {
-      addTypeScore(scores, "music", 7);
-    }
-  }
-
-  if (host.includes("goodreads.com") || host.includes("thestorygraph.com") || host.includes("storygraph.com")) {
-    addTypeScore(scores, "book", 10);
-  }
-
-  if (
-    host.includes("steampowered.com") ||
-    host.includes("store.steampowered.com") ||
-    host.includes("itch.io") ||
-    host.includes("backloggd.com")
-  ) {
-    addTypeScore(scores, "game", 10);
-  }
-
-  if (
-    host.includes("substack.com") ||
-    host.includes("lesswrong.com") ||
-    host.includes("medium.com") ||
-    host.includes("arxiv.org") ||
-    host.includes("openai.com") ||
-    host.includes("anthropic.com") ||
-    host.includes("gwern.net") ||
-    host.includes("poetryfoundation.org") ||
-    host.includes("colossus.com") ||
-    host.startsWith("blog.")
-  ) {
-    addTypeScore(scores, "article", 8);
-  }
-
-  if (
-    path.includes("/article/") ||
-    path.includes("/articles/") ||
-    path.includes("/essay/") ||
-    path.includes("/essays/") ||
-    path.includes("/blog/") ||
-    path.includes("/post/") ||
-    path.includes("/posts/") ||
-    path.startsWith("/p/")
-  ) {
-    addTypeScore(scores, "article", 5);
-  }
-
-  if (/\b(article|essay|newsletter|blog|column|paper)\b/.test(title)) {
-    addTypeScore(scores, "article", 3);
-  }
-
-  scorePageSignals(scores, pageSignals);
-
-  const rankedTypes = Object.entries(scores).sort((a, b) => b[1] - a[1]);
-  if (rankedTypes.length > 0 && rankedTypes[0][1] >= 5) {
-    return rankedTypes[0][0];
-  }
-
-  const looksLikeArticlePage =
-    !includesAny(host, [
-      "mangadex",
-      "mangaplus",
-      "mangafire",
-      "mangafreak.me",
-      "crunchyroll.com",
-      "anikoto.com",
-      "anikototv.to",
-      "hidive.com",
-      "youtube.com",
-      "youtu.be",
-      "open.spotify.com",
-      "podcasts.apple.com",
-      "goodreads.com",
-      "storygraph.com",
-      "steampowered.com",
-      "itch.io",
-    ]) &&
-    path !== "/" &&
-    !/\.(png|jpe?g|gif|webp|svg|pdf|mp3|mp4)$/i.test(path);
-
-  if (looksLikeArticlePage) {
-    return "article";
-  }
-
-  return null;
 }
 
 async function saveAddDraft() {
@@ -1344,42 +1024,50 @@ let rolloverArchivedWeek = null;
 
 // --- Add Entry ---
 
+let metadataRequest = 0;
+const fieldEdits = { title: 0, url: 0, type: 0 };
+
 async function prefillFromTab({ preserveDraftType = false } = {}) {
+  const request = ++metadataRequest;
   const titleInput = document.getElementById("entry-title");
   const urlInput = document.getElementById("entry-url");
   const typeInput = document.getElementById("entry-type");
   const dateInput = document.getElementById("entry-date");
+  const initial = { title: titleInput.value, url: urlInput.value, type: typeInput.value, edits: { ...fieldEdits } };
+  if (!dateInput.value) dateInput.value = formatDate(new Date());
 
   try {
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-    if (tab) {
-      if (!urlInput.value) {
-        urlInput.value = tab.url || "";
-      }
-      if (!titleInput.value) {
-        titleInput.value = tab.title || "";
-      }
-
-      if (!preserveDraftType && (!typeInput.value || typeInput.value === DEFAULT_ENTRY_TYPE)) {
-        const pageSignals = await extractPageSignals(tab.id);
-        const inferredType = inferTypeFromTab(tab, pageSignals);
-        if (inferredType && SELECTABLE_ENTRY_TYPES.has(inferredType)) {
-          typeInput.value = inferredType;
-        }
+    if (!tab || request !== metadataRequest || (initial.url && initial.url !== tab.url)) return;
+    if (fieldEdits.url !== initial.edits.url) return;
+    if (!initial.url) urlInput.value = tab.url || "";
+    // Original capture: use the browser title immediately, without rewriting it.
+    if (!initial.title && fieldEdits.title === initial.edits.title) titleInput.value = tab.title || "";
+    if (!/^https?:\/\//i.test(tab.url || "")) return;
+    const signals = await extractPageSignals(tab.id);
+    if (request !== metadataRequest || fieldEdits.url !== initial.edits.url || urlInput.value !== tab.url) return;
+    // A navigation during injection must not mix one page URL with another page title.
+    if (signals?.url && signals.url !== tab.url) return;
+    const metadata = MediaLogMetadata.detect({ url: tab.url, title: tab.title, signals });
+    if (!preserveDraftType && fieldEdits.type === initial.edits.type && (!initial.type || initial.type === DEFAULT_ENTRY_TYPE)) {
+      if (SELECTABLE_ENTRY_TYPES.has(metadata.type)) {
+        typeInput.value = metadata.type;
       }
     }
   } catch {
-    // Tab API may not be available in some contexts
-  }
-
-  if (!dateInput.value) {
-    dateInput.value = formatDate(new Date());
+    // Missing page permissions leave the editable fields available.
   }
 }
 
 for (const id of ["entry-url", "entry-title", "entry-type", "entry-date", "entry-rating", "entry-note"]) {
-  document.getElementById(id).addEventListener("input", saveAddDraft);
-  document.getElementById(id).addEventListener("change", saveAddDraft);
+  const field = document.getElementById(id);
+  const recordEdit = () => {
+    const name = id.slice(6);
+    if (name in fieldEdits) fieldEdits[name]++;
+    saveAddDraft();
+  };
+  field.addEventListener("input", recordEdit);
+  field.addEventListener("change", recordEdit);
 }
 
 document.getElementById("entry-form").addEventListener("submit", async (e) => {

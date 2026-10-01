@@ -60,6 +60,7 @@ const releaseFiles = [
   "popup.html",
   "popup.css",
   "popup.js",
+  "media-metadata.js",
   "icons/icon16.png",
   "icons/icon48.png",
   "icons/icon128.png",

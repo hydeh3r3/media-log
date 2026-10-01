@@ -1,0 +1,90 @@
+<!doctype html>
+<html windowtype="navigator:browser">
+<head>
+  <meta charset="utf-8">
+  <title>Media Log: Zen toolbar regression</title>
+  <style>
+    body { font: 14px sans-serif; margin: 24px; background: #242031; color: #eee; }
+    toolbar, #zen-overflow-extensions-list { display: flex; align-items: center; gap: 8px; width: 240px; }
+    toolbaritem, .unified-extensions-item-row-wrapper { display: flex; }
+    toolbaritem { width: 44px; background: #40384f; border-radius: 8px; }
+    .unified-extensions-item-row-wrapper { flex: 1; min-width: 0; }
+    .unified-extensions-item-action-button { display: flex; align-items: center; flex: 1; min-width: 0; padding: 8px; }
+    .toolbarbutton-badge-stack { display: flex; flex-shrink: 0; }
+    .toolbarbutton-icon { display: block; width: 16px; height: 16px; background: #deae87; }
+    .subviewbutton .toolbarbutton-icon { width: 32px; height: 32px; }
+    .subviewbutton .toolbarbutton-badge-stack { margin-inline-end: 6px; }
+    .unified-extensions-item-contents { display: block; min-width: 8px; }
+    .unified-extensions-item-message { display: block; word-break: break-word; }
+    .unified-extensions-item-menu-button { display: block; padding: 0; }
+    .unified-extensions-item-menu-button.toolbarbutton-1,
+    .unified-extensions-item-action-button.toolbarbutton-1 > .unified-extensions-item-contents { display: none; }
+    panel, panelview, menupopup { display: block; width: 320px; }
+    :is(panel, panelview, menupopup) toolbaritem { width: 320px; }
+  </style>
+</head>
+<body>
+  <h1>Zen's stale menu class in a toolbar slot</h1>
+  <div id="fixture"></div>
+  <script>
+    const widgetID = "media-log_wetbrain_local-browser-action";
+    const fixture = document.getElementById("fixture");
+    function place({ area = "nav-bar", state = "subviewbutton", panel = "", id = widgetID, overflow = true } = {}) {
+      const widget = `<toolbaritem id="${id}" overflowedItem="${overflow}" cui-areatype="${overflow ? "panel" : "toolbar"}">
+        <div class="unified-extensions-item-row-wrapper">
+          <button class="unified-extensions-item-action-button ${state}" aria-label="Media Log" title="Media Log">
+            <span class="toolbarbutton-badge-stack"><span class="toolbarbutton-icon"></span><span class="toolbarbutton-badge"></span></span>
+            <span class="unified-extensions-item-contents"><span class="unified-extensions-item-message">Run for this visit only</span></span>
+          </button>
+          <button class="unified-extensions-item-menu-button ${state}">...</button>
+        </div>
+      </toolbaritem>`;
+      const tag = area === "zen-overflow-extensions-list" ? "div" : "toolbar";
+      fixture.innerHTML = `<${tag} id="${area}">${panel ? `<${panel}>${widget}</${panel}>` : widget}</${tag}>`;
+      return document.getElementById(id);
+    }
+    function metrics(widget) {
+      const contents = widget.querySelector(".unified-extensions-item-contents");
+      const menu = widget.querySelector(".unified-extensions-item-menu-button");
+      return {
+        height: widget.getBoundingClientRect().height,
+        contentsHidden: getComputedStyle(contents).display === "none",
+        menuHidden: getComputedStyle(menu).display === "none",
+        iconWidth: widget.querySelector(".toolbarbutton-icon").getBoundingClientRect().width,
+      };
+    }
+    function check(condition, message) { if (!condition) throw new Error(message); }
+    function runLayoutChecks() {
+      let cases = 0;
+      for (const area of ["nav-bar", "TabsToolbar", "zen-sidebar-top-buttons", "zen-sidebar-foot-buttons", "zen-overflow-extensions-list"]) {
+        for (const state of ["subviewbutton", "toolbarbutton-1"]) {
+          for (const overflow of [false, true]) {
+            const widget = place({ area, state, overflow });
+            const result = metrics(widget);
+            check(result.contentsHidden && result.menuHidden && result.height <= 40 && result.iconWidth === 16, `${area}/${state}/${overflow}: ${JSON.stringify(result)}`);
+            check(widget.querySelector("button").getAttribute("title") === "Media Log", "Tooltip changed");
+            check(widget.querySelector(".toolbarbutton-badge"), "Permission badge removed");
+            cases++;
+          }
+        }
+      }
+      for (const panel of ["panel", "panelview", "menupopup"]) {
+        const result = metrics(place({ panel }));
+        check(!result.contentsHidden && !result.menuHidden && result.iconWidth === 32, `${panel}: menu controls were hidden`);
+        cases++;
+      }
+      const other = metrics(place({ id: "other-addon-browser-action" }));
+      check(!other.contentsHidden && !other.menuHidden && other.iconWidth === 32, "Other extension changed");
+      cases++;
+      document.documentElement.removeAttribute("windowtype");
+      const outside = metrics(place());
+      check(!outside.contentsHidden && !outside.menuHidden, "Style affected a non-browser document");
+      document.documentElement.setAttribute("windowtype", "navigator:browser");
+      cases++;
+      place();
+      return { passed: cases, compact: metrics(document.getElementById(widgetID)) };
+    }
+    place();
+  </script>
+</body>
+</html>

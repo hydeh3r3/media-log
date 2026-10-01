@@ -48,7 +48,7 @@ for (const iconPath of Object.values(manifest.action?.default_icon || {})) {
   requireFile(iconPath);
 }
 
-const sourceFiles = ["manifest.json", "popup.html", "popup.css", "popup.js"];
+const sourceFiles = ["manifest.json", "popup.html", "popup.css", "popup.js", "media-metadata.js"];
 const bridgePatterns = ["43187", "publish:bridge", "Publish to Website"];
 for (const file of sourceFiles) {
   const text = await Bun.file(join(EXTENSION_DIR, file)).text();

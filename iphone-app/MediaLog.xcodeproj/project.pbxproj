@@ -7,6 +7,8 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+        B00000000000000000000001 /* MediaMetadata.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000002 /* MediaMetadata.swift */; };
+        B00000000000000000000003 /* media-metadata.js in Resources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000004 /* media-metadata.js */; };
 		A00000000000000000000011 /* MediaLogApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000010 /* MediaLogApp.swift */; };
 		A00000000000000000000013 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000012 /* ContentView.swift */; };
 		A00000000000000000000015 /* EntryEditorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000014 /* EntryEditorView.swift */; };
@@ -23,6 +25,8 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+        B00000000000000000000002 /* MediaMetadata.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MediaMetadata.swift; sourceTree = "<group>"; };
+        B00000000000000000000004 /* media-metadata.js */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.javascript; path = ../shared/media-metadata.js; sourceTree = SOURCE_ROOT; };
 		A00000000000000000000005 /* MediaLog.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = MediaLog.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		A00000000000000000000010 /* MediaLogApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MediaLogApp.swift; sourceTree = "<group>"; };
 		A00000000000000000000012 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
@@ -75,6 +79,8 @@
 				A00000000000000000000010 /* MediaLogApp.swift */,
 				A00000000000000000000012 /* ContentView.swift */,
 				A00000000000000000000014 /* EntryEditorView.swift */,
+                B00000000000000000000002 /* MediaMetadata.swift */,
+                B00000000000000000000004 /* media-metadata.js */,
 				A00000000000000000000016 /* KeychainTokenStore.swift */,
 				A00000000000000000000018 /* MediaLogStore.swift */,
 				A0000000000000000000001A /* Models.swift */,
@@ -147,6 +153,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				A00000000000000000000025 /* Assets.xcassets in Resources */,
+                B00000000000000000000003 /* media-metadata.js in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -160,6 +167,7 @@
 				A00000000000000000000011 /* MediaLogApp.swift in Sources */,
 				A00000000000000000000013 /* ContentView.swift in Sources */,
 				A00000000000000000000015 /* EntryEditorView.swift in Sources */,
+                B00000000000000000000001 /* MediaMetadata.swift in Sources */,
 				A00000000000000000000017 /* KeychainTokenStore.swift in Sources */,
 				A00000000000000000000019 /* MediaLogStore.swift in Sources */,
 				A0000000000000000000001B /* Models.swift in Sources */,

@@ -6,12 +6,15 @@ It can:
 
 - show this week's entries
 - add, edit, and delete entries
+- suggest the media type from a URL in a new entry
 - show archived weeks
 - edit and delete archived entries
 - save data on device
 - sync with the same JSON endpoint as the Chrome extension
 
 The app stores media log data in its local JSON file. Sync credentials are stored in Keychain.
+
+For a new entry, enter the title by hand and paste a full web URL to find its media type. You can change the suggested type. The lookup reads public page HTML without saved cookies and never changes the title field. See [capture notes](../docs/media-detection-notes.md) for examples and limits.
 
 ## Build Check
 
