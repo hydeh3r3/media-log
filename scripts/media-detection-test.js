@@ -20,6 +20,15 @@ for (const fixture of fixtures) {
 console.log(`${fixtures.length - failures}/${fixtures.length} media detection examples passed.`);
 if (failures) process.exitCode = 1;
 
+for (const host of ["animepahe.com", "animepahe.pw", "www.animepahe.pw"]) {
+  assert.equal(detect({ url: `https://${host}/play/example`, title: "Psyren Ep. 1 :: animepahe" }).title, "Psyren Ep. 1");
+  assert.equal(detect({ url: `https://${host}/play/example`, signals: { title: "Psyren Ep. 1 :: AnimePahe  " } }).title, "Psyren Ep. 1");
+  assert.equal(detect({ url: `https://${host}/play/example`, title: "Psyren :: animepahe discussion" }).title, "Psyren :: animepahe discussion");
+}
+for (const host of ["example.com", "animepahe.com.example.com", "fakeanimepahe.pw"]) {
+  assert.equal(detect({ url: `https://${host}/play/example`, title: "Psyren Ep. 1 :: animepahe" }).title, "Psyren Ep. 1 :: animepahe");
+}
+
 const html = `<!doctype html><html><head>
   <title>Wrong document title | News</title>
   <meta content='article' property='og:type'>

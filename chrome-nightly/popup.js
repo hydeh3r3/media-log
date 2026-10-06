@@ -433,8 +433,8 @@ async function prefillFromTab({ preserveDraftType = false } = {}) {
     if (!tab || request !== metadataRequest || (initial.url && initial.url !== tab.url)) return;
     if (fieldEdits.url !== initial.edits.url) return;
     if (!initial.url) urlInput.value = tab.url || "";
-    // Original capture: use the browser title immediately, without rewriting it.
-    if (!initial.title && fieldEdits.title === initial.edits.title) titleInput.value = tab.title || "";
+    // Fill the title immediately, including site-specific cleanup, before fetching metadata.
+    if (!initial.title && fieldEdits.title === initial.edits.title) titleInput.value = MediaLogMetadata.detect({ url: tab.url, title: tab.title || "" }).title;
     if (!/^https?:\/\//i.test(tab.url || "")) return;
     const signals = await extractPageSignals(tab.id);
     if (request !== metadataRequest || fieldEdits.url !== initial.edits.url || urlInput.value !== tab.url) return;

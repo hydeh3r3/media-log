@@ -108,15 +108,16 @@
   function detect(input = {}) {
     const signals = object(input.signals) ? input.signals : {};
     const page = parseURL(input.url || signals.url);
-    // Preserve the supplied page title exactly. Metadata is used only for type detection.
+    // Preserve the supplied title except for the requested site-specific suffixes.
     const rawTitle = typeof input.title === "string" ? input.title
       : typeof signals.title === "string" ? signals.title : "";
     if (!page) return { title: rawTitle, type: null, reason: "Use an HTTP or HTTPS content page" };
     if (onAny(page.host, ["animepahe.com", "animepahe.pw"])) {
-      return { title: rawTitle, type: "anime", reason: "AnimePahe" };
+      return { title: rawTitle.replace(/\s*::\s*animepahe\s*$/i, ""), type: "anime", reason: "AnimePahe" };
     }
+    const title = onDomain(page.host, "imdb.com") ? rawTitle.replace(/\s+-\s+IMDb\s*$/i, "") : rawTitle;
     const entity = selectEntity(signals, input.url || signals.url);
-    return { title: rawTitle, ...typeForPage(page, signals, entity, rawTitle) };
+    return { title, ...typeForPage(page, signals, entity, rawTitle) };
   }
 
   // Serialized by scripting.executeScript. Must only use page globals and local helpers.

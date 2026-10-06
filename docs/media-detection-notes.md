@@ -2,11 +2,13 @@
 
 ## Current Behavior
 
-The title changes have been reverted at the user's request.
+Broad title cleanup has been reverted at the user's request. Only the site rules below change titles.
 
-- Chrome Nightly, Chrome Stable, and Firefox/Zen copy the browser tab title exactly.
+- Chrome Nightly, Chrome Stable, and Firefox/Zen copy the browser tab title, with two small exceptions.
+- On IMDb links, the trailing `- IMDb` label is removed. The movie name and year stay intact.
+- On AnimePahe `.com` and `.pw` links, the trailing `:: animepahe` label is removed.
 - Page headings and structured names do not replace that title.
-- Site names, playback text, punctuation, and existing episode text are left alone.
+- Other site names, playback text, punctuation, and existing episode text are left alone.
 - No season or episode text is added from the URL or page metadata.
 - The title fills in immediately, without waiting for type detection.
 - iOS titles are entered by hand, as before. URL lookup suggests only a media type.
@@ -30,10 +32,11 @@ This rollback also removes the recent punctuation conversion. If a page title co
 | Browser tab title | Captured title | Type |
 | --- | --- | --- |
 | Watch Show Name S02E03 Online \| Anikoto | Watch Show Name S02E03 Online \| Anikoto | Anime |
-| Naruto: Shippuden - 24 :: animepahe | Naruto: Shippuden - 24 :: animepahe | Anime |
+| Naruto: Shippuden - 24 :: animepahe | Naruto: Shippuden - 24 | Anime |
+| Primal Fear (1996) - IMDb | Primal Fear (1996) | Film |
 | A Conversation - YouTube | A Conversation - YouTube | Podcast |
 
-The title is copied, not rewritten. On iOS, the title remains whatever you enter.
+Only those trailing labels are removed on their own sites. Titles you type or save as drafts are left alone. On iOS, the title remains whatever you enter.
 
 ## Try the Changes
 
@@ -61,4 +64,4 @@ bun run verify
 
 The sync command copies the same engine into all three extensions. iOS bundles the shared file directly. The check fails if a browser copy differs.
 
-The 50 shared cases check type detection and unchanged titles. Browser form tests also cover immediate title capture, manual edits, saved drafts, restricted pages, and YouTube defaults. The native smoke test checks JavaScriptCore and confirms the iOS lookup cannot change the title field.
+The shared cases check type detection, site-specific labels, and unchanged titles on other sites. Browser form tests also cover immediate title capture, manual edits, saved drafts, restricted pages, and YouTube defaults. The native smoke test checks JavaScriptCore and confirms the iOS lookup cannot change the title field.

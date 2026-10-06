@@ -41,6 +41,41 @@ async function setup(directory, { title = "", url = "", type = "article", delaye
 }
 
 for (const directory of ["chrome-nightly", "chrome-stable", "firefox-extension"]) {
+  const imdbTab = { id: 12, url: "https://www.imdb.com/title/tt0117381/", title: "Primal Fear (1996) - IMDb" };
+  for (const rejected of [false, true]) {
+    const movie = await setup(directory, { tab: imdbTab, rejected });
+    await movie.prefill();
+    assert.equal(movie.element("entry-title").value, "Primal Fear (1996)");
+    assert.equal(movie.element("entry-type").value, "film");
+  }
+  const imdbEdited = await setup(directory, { tab: imdbTab, delayed: true });
+  const imdbLoading = imdbEdited.prefill();
+  await Promise.resolve();
+  assert.equal(imdbEdited.element("entry-title").value, "Primal Fear (1996)", "IMDb cleanup must not wait for page metadata");
+  imdbEdited.element("entry-title").value = "My movie title - IMDb";
+  imdbEdited.element("entry-title").dispatch("input");
+  imdbEdited.release();
+  await imdbLoading;
+  assert.equal(imdbEdited.element("entry-title").value, "My movie title - IMDb");
+  const imdbDraft = await setup(directory, { tab: imdbTab, title: "My saved title - IMDb", url: imdbTab.url });
+  await imdbDraft.prefill();
+  assert.equal(imdbDraft.element("entry-title").value, "My saved title - IMDb");
+  for (const domain of ["animepahe.com", "animepahe.pw"]) {
+    const tab = { id: 11, url: `https://${domain}/play/example`, title: "Psyren Ep. 1 :: animepahe" };
+    const anime = await setup(directory, { tab, rejected: true });
+    await anime.prefill();
+    assert.equal(anime.element("entry-title").value, "Psyren Ep. 1");
+    assert.equal(anime.element("entry-type").value, "anime");
+    const edited = await setup(directory, { tab, delayed: true });
+    const loading = edited.prefill();
+    await Promise.resolve();
+    assert.equal(edited.element("entry-title").value, "Psyren Ep. 1");
+    edited.element("entry-title").value = "My anime title";
+    edited.element("entry-title").dispatch("input");
+    edited.release();
+    await loading;
+    assert.equal(edited.element("entry-title").value, "My anime title");
+  }
   const normal = await setup(directory);
   await normal.prefill();
   assert.equal(normal.element("entry-title").value, "Watch Naruto: Shippuden Anime English SUB/DUB - Anikoto");
@@ -85,5 +120,5 @@ for (const directory of ["chrome-nightly", "chrome-stable", "firefox-extension"]
   const internal = await setup(directory, { tab: { id: 10, url: "about:blank", title: "Internal tab title" } });
   await internal.prefill();
   assert.equal(internal.element("entry-title").value, "Internal tab title");
-  console.log(`${directory}: prefill, manual edits, saved draft, URL fallback, and YouTube default/override passed.`);
+  console.log(`${directory}: IMDb cleanup, prefill, manual edits, saved draft, URL fallback, and YouTube default/override passed.`);
 }
