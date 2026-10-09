@@ -41,6 +41,20 @@ async function setup(directory, { title = "", url = "", type = "article", delaye
 }
 
 for (const directory of ["chrome-nightly", "chrome-stable", "firefox-extension"]) {
+  const mangaTab = { id: 13, url: "https://mangafreak.me/Read1_One_Piece_1195", title: "Read One Piece Chapter 1195 - MangaFreak" };
+  const manga = await setup(directory, { tab: mangaTab, rejected: true });
+  await manga.prefill();
+  assert.equal(manga.element("entry-title").value, "One Piece Chapter 1195");
+  assert.equal(manga.element("entry-type").value, "manga");
+  const mangaEdited = await setup(directory, { tab: mangaTab, delayed: true });
+  const mangaLoading = mangaEdited.prefill();
+  await Promise.resolve();
+  assert.equal(mangaEdited.element("entry-title").value, "One Piece Chapter 1195", "MangaFreak cleanup must not wait for page metadata");
+  mangaEdited.element("entry-title").value = "My chapter title";
+  mangaEdited.element("entry-title").dispatch("input");
+  mangaEdited.release();
+  await mangaLoading;
+  assert.equal(mangaEdited.element("entry-title").value, "My chapter title");
   const imdbTab = { id: 12, url: "https://www.imdb.com/title/tt0117381/", title: "Primal Fear (1996) - IMDb" };
   for (const rejected of [false, true]) {
     const movie = await setup(directory, { tab: imdbTab, rejected });
@@ -120,5 +134,5 @@ for (const directory of ["chrome-nightly", "chrome-stable", "firefox-extension"]
   const internal = await setup(directory, { tab: { id: 10, url: "about:blank", title: "Internal tab title" } });
   await internal.prefill();
   assert.equal(internal.element("entry-title").value, "Internal tab title");
-  console.log(`${directory}: IMDb cleanup, prefill, manual edits, saved draft, URL fallback, and YouTube default/override passed.`);
+  console.log(`${directory}: MangaFreak/IMDb cleanup, prefill, manual edits, saved draft, URL fallback, and YouTube default/override passed.`);
 }

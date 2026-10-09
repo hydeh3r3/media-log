@@ -108,14 +108,19 @@
   function detect(input = {}) {
     const signals = object(input.signals) ? input.signals : {};
     const page = parseURL(input.url || signals.url);
-    // Preserve the supplied title except for the requested site-specific suffixes.
+    // Preserve the supplied title except for the requested site-specific labels.
     const rawTitle = typeof input.title === "string" ? input.title
       : typeof signals.title === "string" ? signals.title : "";
     if (!page) return { title: rawTitle, type: null, reason: "Use an HTTP or HTTPS content page" };
     if (onAny(page.host, ["animepahe.com", "animepahe.pw"])) {
       return { title: rawTitle.replace(/\s*::\s*animepahe\s*$/i, ""), type: "anime", reason: "AnimePahe" };
     }
-    const title = onDomain(page.host, "imdb.com") ? rawTitle.replace(/\s+-\s+IMDb\s*$/i, "") : rawTitle;
+    let title = rawTitle;
+    if (onDomain(page.host, "imdb.com")) title = rawTitle.replace(/\s+-\s+IMDb\s*$/i, "");
+    // Match mangafreak.<TLD> and its subdomains, including alternate mirror domains.
+    else if (/(?:^|\.)mangafreak\.[a-z]{2,}$/.test(page.host)) {
+      title = rawTitle.replace(/^\s*Read\s+/i, "").replace(/\s+-\s+MangaFreak\s*$/i, "");
+    }
     const entity = selectEntity(signals, input.url || signals.url);
     return { title, ...typeForPage(page, signals, entity, rawTitle) };
   }
