@@ -455,14 +455,28 @@ button.secondary-action:hover {
   border: 1px solid var(--border);
 }
 
+/* Grid columns: arrow, title, Publish. The publish message spans a second row
+   under the title, so it stays beside the button whether or not the week is open. */
 .history-week summary {
-  display: flex;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
-  justify-content: space-between;
-  gap: 8px;
+  gap: 4px 8px;
   padding: 10px 12px;
   cursor: pointer;
   list-style: none;
+}
+
+.history-week-status {
+  grid-column: 2 / -1;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--accent);
+  cursor: default;
+}
+
+.history-week-status:empty {
+  display: none;
 }
 
 .history-week summary::-webkit-details-marker {

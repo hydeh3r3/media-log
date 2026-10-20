@@ -203,10 +203,36 @@ function getPublishElements(scope) {
   };
 }
 
-function showPublishStatus(scope, message, isError = false) {
-  const { status } = getPublishElements(scope);
+function setStatusMessage(status, message, isError = false) {
   status.textContent = message;
   status.style.color = isError ? "var(--danger)" : "var(--accent)";
+}
+
+function showPublishStatus(scope, message, isError = false) {
+  const { status } = getPublishElements(scope);
+  setStatusMessage(status, message, isError);
+}
+
+// History publish messages sit under their own week. They are keyed by week so
+// they survive re-renders from searching or switching tabs.
+const historyPublishStatuses = new Map();
+
+function getHistoryWeekKey(weekData) {
+  return `${weekData.year}-W${weekData.weekNumber}`;
+}
+
+function showHistoryPublishStatus(weekKey, message, isError = false) {
+  historyPublishStatuses.set(weekKey, { message, isError });
+  for (const status of document.querySelectorAll(`.history-week-status[data-week="${weekKey}"]`)) {
+    setStatusMessage(status, message, isError);
+  }
+}
+
+function clearHistoryPublishStatuses() {
+  historyPublishStatuses.clear();
+  for (const status of document.querySelectorAll(".history-week-status")) {
+    status.textContent = "";
+  }
 }
 
 function getErrorMessage(error) {
@@ -224,7 +250,7 @@ function hideXOutput(scope) {
 
 function hideAllXOutputs() {
   hideXOutput("week");
-  hideXOutput("history");
+  clearHistoryPublishStatuses();
 }
 
 function getAddDraft() {
@@ -849,6 +875,15 @@ async function renderHistory() {
       `Week ${weekData.weekNumber}, ${weekData.year} (${formatDateRange(start, end)}) — ${entryCount}`,
     );
 
+    const weekKey = getHistoryWeekKey(weekData);
+    const status = document.createElement("span");
+    status.className = "history-week-status";
+    status.dataset.week = weekKey;
+    const savedStatus = historyPublishStatuses.get(weekKey);
+    if (savedStatus) setStatusMessage(status, savedStatus.message, savedStatus.isError);
+    // The message is part of the summary row; clicking it should not toggle the week.
+    status.addEventListener("click", (event) => event.preventDefault());
+
     const actions = document.createElement("span");
     actions.className = "history-summary-actions";
     const publishButton = document.createElement("button");
@@ -860,16 +895,16 @@ async function renderHistory() {
       event.stopPropagation();
 
       try {
-        hideXOutput("history");
-        showPublishStatus("history", `Publishing Week ${weekData.weekNumber}...`);
+        clearHistoryPublishStatuses();
+        showHistoryPublishStatus(weekKey, `Publishing Week ${weekData.weekNumber}...`);
         const result = await publishWeekToWebsite(weekData);
-        showPublishStatus("history", `Published "${result.title}" to website files.`);
+        showHistoryPublishStatus(weekKey, `Published "${result.title}" to website files.`);
       } catch (error) {
-        showPublishStatus("history", getErrorMessage(error), true);
+        showHistoryPublishStatus(weekKey, getErrorMessage(error), true);
       }
     });
     actions.appendChild(publishButton);
-    summary.append(title, actions);
+    summary.append(title, actions, status);
 
     const entries = document.createElement("div");
     entries.className = "history-entries";
