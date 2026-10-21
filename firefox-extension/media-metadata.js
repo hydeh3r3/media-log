@@ -121,6 +121,11 @@
     else if (/(?:^|\.)mangafreak\.[a-z]{2,}$/.test(page.host)) {
       title = rawTitle.replace(/^\s*Read\s+/i, "").replace(/\s+-\s+MangaFreak\s*$/i, "");
     }
+    else if (onDomain(page.host, "anikototv.to")) {
+      title = rawTitle.replace(/^\s*Watch\s+/i, "")
+        .replace(/\s+Anime\s+English\s+SUB\/DUB\s+-\s+Anikoto\s*$/i, "");
+    }
+    else if (onAny(page.host, youtubeDomains)) title = rawTitle.replace(/\s+-\s+YouTube\s*$/i, "");
     const entity = selectEntity(signals, input.url || signals.url);
     return { title, ...typeForPage(page, signals, entity, rawTitle) };
   }

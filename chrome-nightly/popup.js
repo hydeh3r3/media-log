@@ -18,7 +18,7 @@ const ENTRY_TYPES = {
   podcast: "Podcast",
   youtube: "YouTube Video",
 };
-const SELECTABLE_ENTRY_TYPES = new Set(["anime", "article", "book", "film", "game", "manga", "music", "podcast", "tv"]);
+const SELECTABLE_ENTRY_TYPES = new Set(["anime", "article", "book", "film", "game", "manga", "podcast", "tv"]);
 const DEFAULT_ENTRY_TYPE = "article";
 const BACKUP_FORMAT = "media-log-backup";
 const BACKUP_VERSION = 1;

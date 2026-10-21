@@ -41,6 +41,20 @@ async function setup(directory, { title = "", url = "", type = "article", delaye
 }
 
 for (const directory of ["chrome-nightly", "chrome-stable", "firefox-extension"]) {
+  const anikotoTab = { id: 14, url: "https://anikototv.to/watch/tokyo-revengers/episode-2", title: "Watch Tokyo Revengers: War of the Three Titan Arc Episode 2 Anime English SUB/DUB - Anikoto" };
+  const anikoto = await setup(directory, { tab: anikotoTab, rejected: true });
+  await anikoto.prefill();
+  assert.equal(anikoto.element("entry-title").value, "Tokyo Revengers: War of the Three Titan Arc Episode 2");
+  assert.equal(anikoto.element("entry-type").value, "anime");
+  const anikotoEdited = await setup(directory, { tab: anikotoTab, delayed: true });
+  const anikotoLoading = anikotoEdited.prefill();
+  await Promise.resolve();
+  assert.equal(anikotoEdited.element("entry-title").value, "Tokyo Revengers: War of the Three Titan Arc Episode 2", "AnikotoTV cleanup must not wait for page metadata");
+  anikotoEdited.element("entry-title").value = "My episode title";
+  anikotoEdited.element("entry-title").dispatch("input");
+  anikotoEdited.release();
+  await anikotoLoading;
+  assert.equal(anikotoEdited.element("entry-title").value, "My episode title");
   const mangaTab = { id: 13, url: "https://mangafreak.me/Read1_One_Piece_1195", title: "Read One Piece Chapter 1195 - MangaFreak" };
   const manga = await setup(directory, { tab: mangaTab, rejected: true });
   await manga.prefill();
@@ -114,19 +128,23 @@ for (const directory of ["chrome-nightly", "chrome-stable", "firefox-extension"]
   await fallback.prefill();
   assert.equal(fallback.element("entry-title").value, "Watch Naruto: Shippuden Anime English SUB/DUB - Anikoto");
   assert.equal(fallback.element("entry-type").value, "anime");
-  const youtubeTab = { id: 8, url: "https://www.youtube.com/watch?v=example", title: "A Conversation - YouTube" };
+  const youtubeTab = { id: 8, url: "https://www.youtube.com/watch?v=example", title: "David Foster Wallace unedited interview (2003) - YouTube" };
   const youtube = await setup(directory, { tab: youtubeTab });
   await youtube.prefill();
   assert.equal(youtube.element("entry-type").value, "podcast");
-  assert.equal(youtube.element("entry-title").value, "A Conversation - YouTube");
+  assert.equal(youtube.element("entry-title").value, "David Foster Wallace unedited interview (2003)");
   const youtubeManual = await setup(directory, { tab: youtubeTab, delayed: true });
   const youtubeLoading = youtubeManual.prefill();
   await Promise.resolve();
-  youtubeManual.element("entry-type").value = "music";
+  assert.equal(youtubeManual.element("entry-title").value, "David Foster Wallace unedited interview (2003)");
+  youtubeManual.element("entry-title").value = "My title - YouTube";
+  youtubeManual.element("entry-title").dispatch("input");
+  youtubeManual.element("entry-type").value = "film";
   youtubeManual.element("entry-type").dispatch("change");
   youtubeManual.release();
   await youtubeLoading;
-  assert.equal(youtubeManual.element("entry-type").value, "music");
+  assert.equal(youtubeManual.element("entry-title").value, "My title - YouTube");
+  assert.equal(youtubeManual.element("entry-type").value, "film");
   const unchangedTitle = "  Show S02E03 — Episode title | Site  ";
   const raw = await setup(directory, { tab: { id: 9, url: "https://example.com/watch/show", title: unchangedTitle } });
   await raw.prefill();
@@ -134,5 +152,5 @@ for (const directory of ["chrome-nightly", "chrome-stable", "firefox-extension"]
   const internal = await setup(directory, { tab: { id: 10, url: "about:blank", title: "Internal tab title" } });
   await internal.prefill();
   assert.equal(internal.element("entry-title").value, "Internal tab title");
-  console.log(`${directory}: MangaFreak/IMDb cleanup, prefill, manual edits, saved draft, URL fallback, and YouTube default/override passed.`);
+  console.log(`${directory}: AnikotoTV/MangaFreak/IMDb cleanup, prefill, manual edits, saved draft, URL fallback, and YouTube default/override passed.`);
 }

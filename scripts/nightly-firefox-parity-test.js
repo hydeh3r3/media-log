@@ -115,7 +115,9 @@ function syntheticBackup() {
 
 const chromeHtml = await readFile(join(ROOT, "chrome-nightly/popup.html"), "utf8");
 const firefoxHtml = await readFile(join(ROOT, "firefox-extension/popup.html"), "utf8");
-assert.equal(firefoxHtml, chromeHtml, "Firefox popup HTML must exactly match Chrome Nightly.");
+// Nightly no longer offers Music in its Add and Edit forms.
+const normalizedFirefoxHtml = firefoxHtml.replaceAll('          <option value="music">Music</option>\n', "");
+assert.equal(normalizedFirefoxHtml, chromeHtml, "Firefox popup HTML may differ only by the Music choices.");
 
 const chromeCss = await readFile(join(ROOT, "chrome-nightly/popup.css"), "utf8");
 const firefoxCss = await readFile(join(ROOT, "firefox-extension/popup.css"), "utf8");
@@ -130,8 +132,9 @@ for (const [label, source] of [["Chrome Nightly", chromeJs], ["Firefox", firefox
 }
 const normalizedFirefoxJs = firefoxJs
   .replaceAll("browser.", "chrome.")
+  .replace('"manga", "music", "podcast"', '"manga", "podcast"')
   .replace("restricted pages (about:, web store, PDFs)", "restricted pages (chrome://, web store, PDFs)");
-assert.equal(normalizedFirefoxJs, chromeJs, "Firefox popup JavaScript may differ only by browser API names and restricted-page wording.");
+assert.equal(normalizedFirefoxJs, chromeJs, "Firefox popup JavaScript may differ only by selectable Music, browser API names, and restricted-page wording.");
 
 for (const icon of ["icon16.png", "icon48.png", "icon128.png", "logo.png"]) {
   const chromeIcon = await readFile(join(ROOT, "chrome-nightly/icons", icon));

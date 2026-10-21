@@ -4,10 +4,12 @@
 
 Broad title cleanup has been reverted at the user's request. Only the site rules below change titles.
 
-- Chrome Nightly, Chrome Stable, and Firefox/Zen copy the browser tab title, with three small exceptions.
+- Chrome Nightly, Chrome Stable, and Firefox/Zen copy the browser tab title, with five small exceptions.
 - On IMDb links, the trailing `- IMDb` label is removed. The movie name and year stay intact.
 - On AnimePahe `.com` and `.pw` links, the trailing `:: animepahe` label is removed.
 - On `mangafreak.<TLD>` links and their subdomains, the leading `Read ` and trailing `- MangaFreak` labels are removed. The manga name and chapter stay intact.
+- On `anikototv.to` links and its subdomains, the leading `Watch ` and trailing `Anime English SUB/DUB - Anikoto` labels are removed. The name and any season or episode text stay intact.
+- On YouTube links, the trailing `- YouTube` label is removed. This also applies to short links, mobile pages, YouTube Music, and privacy embeds.
 - Page headings and structured names do not replace that title.
 - Other site names, playback text, punctuation, and existing episode text are left alone.
 - No season or episode text is added from the URL or page metadata.
@@ -33,10 +35,11 @@ This rollback also removes the recent punctuation conversion. If a page title co
 | Browser tab title | Captured title | Type |
 | --- | --- | --- |
 | Watch Show Name S02E03 Online \| Anikoto | Watch Show Name S02E03 Online \| Anikoto | Anime |
+| Watch Tokyo Revengers: War of the Three Titan Arc Episode 2 Anime English SUB/DUB - Anikoto | Tokyo Revengers: War of the Three Titan Arc Episode 2 | Anime |
 | Naruto: Shippuden - 24 :: animepahe | Naruto: Shippuden - 24 | Anime |
 | Primal Fear (1996) - IMDb | Primal Fear (1996) | Film |
 | Read One Piece Chapter 1195 - MangaFreak | One Piece Chapter 1195 | Manga |
-| A Conversation - YouTube | A Conversation - YouTube | Podcast |
+| David Foster Wallace unedited interview (2003) - YouTube | David Foster Wallace unedited interview (2003) | Podcast |
 
 Only those labels are removed on their own sites. Titles you type or save as drafts are left alone. On iOS, the title remains whatever you enter.
 
