@@ -9,6 +9,15 @@
 *.pfx
 *.key
 *.crt
+*.p8
+*.keystore
+*.jks
+.netrc
+.npmrc
+credentials*.json
+service-account*.json
+service_account*.json
+secrets*.json
 
 # Dependencies and tool caches
 node_modules/
@@ -29,6 +38,8 @@ dist/
 *.sqlite-*
 *.db
 *.db-*
+*.ldb
+*.sst
 .local-sync/
 
 # Extension build output and local browser storage exports
@@ -38,5 +49,25 @@ web-ext-artifacts/
 chrome-storage-export*.json
 firefox-storage-import*.json
 media-log-storage*.json
+media-log-full-backup*.json
+media-log-backup*.json
+media-log-*-w*.json
+media-log-sync*.json
+arc-*.json
+helium-*.json
+protected-before.json
+data-verification.json
+verification.json
+removed-paths.json
+arc-original-storage/
+reader-storage/
+data-before/
+data-after/
+media-log-backups/
+media-log-recovery*/
+*.tar
+*.tar.gz
+*.tgz
+*.7z
 browser-profile*/
 browser-storage*/
