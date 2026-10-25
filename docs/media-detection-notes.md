@@ -4,17 +4,17 @@
 
 Broad title cleanup has been reverted at the user's request. Only the site rules below change titles.
 
-- Chrome Nightly, Chrome Stable, and Firefox/Zen copy the browser tab title, with five small exceptions.
+- Nightly copies the browser tab title, with six small exceptions.
 - On IMDb links, the trailing `- IMDb` label is removed. The movie name and year stay intact.
 - On AnimePahe `.com` and `.pw` links, the trailing `:: animepahe` label is removed.
 - On `mangafreak.<TLD>` links and their subdomains, the leading `Read ` and trailing `- MangaFreak` labels are removed. The manga name and chapter stay intact.
 - On `anikototv.to` links and its subdomains, the leading `Watch ` and trailing `Anime English SUB/DUB - Anikoto` labels are removed. The name and any season or episode text stay intact.
 - On YouTube links, the trailing `- YouTube` label is removed. This also applies to short links, mobile pages, YouTube Music, and privacy embeds.
+- On MANGA Plus links, the trailing `| MANGA Plus` or `- MANGA Plus` label is removed. The chapter number and manga name stay intact.
 - Page headings and structured names do not replace that title.
 - Other site names, playback text, punctuation, and existing episode text are left alone.
 - No season or episode text is added from the URL or page metadata.
 - The title fills in immediately, without waiting for type detection.
-- iOS titles are entered by hand, as before. URL lookup suggests only a media type.
 - Saved entries and history are unchanged.
 
 This rollback also removes the recent punctuation conversion. If a page title contains an em dash, the original title keeps it.
@@ -39,21 +39,20 @@ This rollback also removes the recent punctuation conversion. If a page title co
 | Naruto: Shippuden - 24 :: animepahe | Naruto: Shippuden - 24 | Anime |
 | Primal Fear (1996) - IMDb | Primal Fear (1996) | Film |
 | Read One Piece Chapter 1195 - MangaFreak | One Piece Chapter 1195 | Manga |
+| [#054] Someone Hertz \| MANGA Plus | [#054] Someone Hertz | Manga |
 | David Foster Wallace unedited interview (2003) - YouTube | David Foster Wallace unedited interview (2003) | Podcast |
 
-Only those labels are removed on their own sites. Titles you type or save as drafts are left alone. On iOS, the title remains whatever you enter.
+Only those labels are removed on their own sites. Titles you type or save as drafts are left alone.
 
 ## Try the Changes
 
-- Chrome Nightly and Chrome Stable: open `chrome://extensions`, then click Reload on the matching unpacked extension.
-- Firefox or Zen: open `about:debugging#/runtime/this-firefox`, then click Reload for Media Log. If it is not loaded, choose Load Temporary Add-on and select `firefox-extension/manifest.json`.
-- iOS: build and run `iphone-app/MediaLog.xcodeproj` again. Paste a URL for a type suggestion; use Find type to retry.
+- Open `chrome://extensions` in your browser, then click Reload for Media Log Nightly.
 
-The full setup steps are in [Install and Test](install-test.md). These are local changes, not a new store release or an update installed on an iPhone.
+The full setup steps are in [Install and Test](install-test.md).
 
 ## Limits and Data Safety
 
-The browser reads the open page for type clues. iOS reads public HTML without saved cookies or page scripts. Login walls and script-loaded pages can prevent type detection. Unknown types keep the current selection.
+The browser reads the open page for type clues. Restricted pages and login walls can prevent type detection. Unknown types keep the current selection. Music is not a selectable type.
 
 No AI service receives page content. The rules run on the device.
 
@@ -67,6 +66,6 @@ bun run check:media-metadata
 bun run verify
 ```
 
-The sync command copies the same engine into all three extensions. iOS bundles the shared file directly. The check fails if a browser copy differs.
+The copy command updates Nightly's bundled metadata file from the shared source. The check fails if that copy differs.
 
-The shared cases check type detection, site-specific labels, and unchanged titles on other sites. Browser form tests also cover immediate title capture, manual edits, saved drafts, restricted pages, and YouTube defaults. The native smoke test checks JavaScriptCore and confirms the iOS lookup cannot change the title field.
+The shared cases check type detection, site-specific labels, and unchanged titles on other sites. Nightly form tests also cover immediate title capture, manual edits, saved drafts, restricted pages, and YouTube defaults.

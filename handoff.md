@@ -1,133 +1,39 @@
-# Media Log Handoff
+# Media Log Nightly Handoff
 
-This repo is now the standalone Media Log product.
+Nightly is the only app in this repo. Its source stays in `chrome-nightly/`.
 
-Chrome Stable and iOS no longer depend on the old website publish bridge. The Zen and Firefox local-use copy matches Chrome Nightly and keeps the bridge workflow.
+## Keep the Install Stable
 
-## Current Product Shape
+Keep Nightly's manifest key and folder path. Use Reload on the existing extension. Removing an extension can remove its browser data.
 
-- `chrome-stable/` is the Chrome Web Store target.
-- `firefox-extension/` is the Zen and Firefox local-use copy of Chrome Nightly.
-- `iphone-app/` is the SwiftUI iOS companion app.
-- `supabase/` is the production sync backend.
-- `scripts/sync-dev-server.js` is the local sync backend.
-- `shared/sync-protocol.md` documents the sync shape.
+Browser storage keeps `currentWeek`, `history`, `addDraft`, `userName`, and `theme`. This cleanup does not change those keys or their format.
 
-## Current Chrome Extension
+The Add and Edit menus offer Anime, Article, Book, Film, Game, Manga, Podcast, and TV Show. YouTube links default to Podcast.
 
-The Chrome extension is a Manifest V3 popup app.
+## Edit and Check
 
-It supports:
-
-- active tab title and URL capture
-- type inference
-- add, edit, and delete for this week
-- history view
-- current-week JSON export
-- local sync
-- Supabase sync
-- local data prep for migration
-
-Release packaging is done with:
+Edit metadata in `shared/media-metadata.js`. Run:
 
 ```sh
-bun run package:chrome
-```
-
-The release zip is written to `dist/`, which is ignored.
-
-## Current iOS App
-
-The iOS app is a SwiftUI app in `iphone-app/MediaLog.xcodeproj`.
-
-It supports:
-
-- current-week list
-- add, edit, and delete
-- archived history
-- edit and delete for archived entries
-- local JSON persistence
-- local sync
-- Supabase sync
-- Keychain storage for sync credentials
-
-Build check:
-
-```sh
-bun run check:ios
-```
-
-Release check:
-
-```sh
-bun run check:ios-release
-```
-
-## Current Sync Path
-
-The production backend is Supabase:
-
-- `supabase/migrations/20260526173000_create_media_log_records.sql`
-- `supabase/functions/media-log-sync/index.ts`
-
-Production sync is gated by a `$2` PostgreSQL entitlement row in `media_log_sync_entitlements`. The repo now includes a Stripe Checkout function and Stripe webhook function, but the live Stripe secrets still need to be set in Supabase.
-
-The local backend is:
-
-- `scripts/sync-dev-server.js`
-
-The one-command verification path runs safe migration, sync, and Stripe webhook smoke tests:
-
-```sh
+bun run sync:media-metadata
 bun run verify
 ```
 
-That command also checks and lints the Firefox and Zen source. It compares the Zen and Firefox popup with Chrome Nightly and tests the full backup format. The migration smoke test runs against Chrome Stable with synthetic private-looking data and checks that reports stay count-only. The sync smoke test writes one synthetic entry to a temporary local server, then simulates two offline clients and verifies both entries survive the merge. The Stripe webhook smoke test signs fake events and checks that only a paid `$2` USD checkout unlocks sync. These tests do not use private log data.
+The backup check reuses Nightly's real validation and storage comparison code with test data. It checks entry counts, missing history, and unsafe URL rejection.
 
-The install handoff is checked too. It must keep the Chrome, Firefox or Zen, iOS, Supabase, Stripe, paid sync, PostgreSQL, and migration steps documented.
+## Backups and Moving Browsers
 
-## Storage Shape
+Open Settings and choose Export All Data. Import that full file in the destination browser, then export again to compare the result. A source backup alone does not prove that an import finished.
 
-The synced snapshot contains:
+Keep private logs and backups outside Git. The existing local data and browser profile storage are preserved.
 
-- `currentWeek`
-- `history`
-- `addDraft`
-- `tombstones`
+## Website Bridge
 
-Entries include stable IDs, creation timestamps, and update timestamps. Merge logic uses IDs and `updatedAt`.
+The current and archived week views can send a chosen week to `http://127.0.0.1:43187/publish` or `http://localhost:43187/publish`. That bridge lives in the website project.
 
-## Migration Path
+## Guides
 
-Use the Chrome extension Sync tab:
-
-1. Click `Prepare Local Data`.
-2. Review the count summary.
-3. Sign in to Supabase.
-4. Click `Sync Now`.
-
-The migration UI reports counts only. It does not print private titles, URLs, or notes.
-
-## Remaining Manual Work
-
-These steps need user accounts, private browser data, or store access:
-
-- create and link the real Supabase project
-- deploy the Supabase migration and Edge Function
-- choose the App Store paid-sync route before App Review
-- set Supabase Auth redirect URLs
-- run the real Chrome storage migration
-- upload the Chrome release zip to the Chrome Web Store
-- fill the Chrome Web Store privacy form with `docs/chrome-web-store-privacy.md`
-- set the Apple developer team in Xcode before device install
-
-## Useful Docs
-
-- [README.md](README.md)
-- [docs/audit.md](docs/audit.md)
-- [docs/install-test.md](docs/install-test.md)
-- [docs/supabase-sync.md](docs/supabase-sync.md)
-- [docs/app-store.md](docs/app-store.md)
-- [docs/chrome-web-store.md](docs/chrome-web-store.md)
-- [docs/chrome-web-store-privacy.md](docs/chrome-web-store-privacy.md)
-- [docs/privacy.md](docs/privacy.md)
+- [Install and Test](docs/install-test.md)
+- [Privacy](docs/privacy.md)
+- [Title and Type Rules](docs/media-detection-notes.md)
+- [Project Audit](docs/audit.md)

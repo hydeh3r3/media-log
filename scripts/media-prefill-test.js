@@ -40,7 +40,7 @@ async function setup(directory, { title = "", url = "", type = "article", delaye
   return { element, prefill, release: () => resolveSignals([{ result: signals }]) };
 }
 
-for (const directory of ["chrome-nightly", "chrome-stable", "firefox-extension"]) {
+for (const directory of ["chrome-nightly"]) {
   const anikotoTab = { id: 14, url: "https://anikototv.to/watch/tokyo-revengers/episode-2", title: "Watch Tokyo Revengers: War of the Three Titan Arc Episode 2 Anime English SUB/DUB - Anikoto" };
   const anikoto = await setup(directory, { tab: anikotoTab, rejected: true });
   await anikoto.prefill();

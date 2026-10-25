@@ -113,50 +113,14 @@ function syntheticBackup() {
   };
 }
 
-const chromeHtml = await readFile(join(ROOT, "chrome-nightly/popup.html"), "utf8");
-const firefoxHtml = await readFile(join(ROOT, "firefox-extension/popup.html"), "utf8");
-// Nightly no longer offers Music in its Add and Edit forms.
-const normalizedFirefoxHtml = firefoxHtml.replaceAll('          <option value="music">Music</option>\n', "");
-assert.equal(normalizedFirefoxHtml, chromeHtml, "Firefox popup HTML may differ only by the Music choices.");
-
-const chromeCss = await readFile(join(ROOT, "chrome-nightly/popup.css"), "utf8");
-const firefoxCss = await readFile(join(ROOT, "firefox-extension/popup.css"), "utf8");
-assert.equal(firefoxCss, chromeCss, "Firefox popup CSS must exactly match Chrome Nightly.");
-
-const chromeJs = await readFile(join(ROOT, "chrome-nightly/popup.js"), "utf8");
-const firefoxJs = await readFile(join(ROOT, "firefox-extension/popup.js"), "utf8");
-for (const [label, source] of [["Chrome Nightly", chromeJs], ["Firefox", firefoxJs]]) {
-  assert.match(source, /const isTransferPage =/, `${label} must detect its persistent transfer tab.`);
-  assert.match(source, /tabs\.create\(/, `${label} must open import in a persistent tab.`);
-  assert.match(source, /verifyPortableStorage\(/, `${label} must read back and verify imported data.`);
-}
-const normalizedFirefoxJs = firefoxJs
-  .replaceAll("browser.", "chrome.")
-  .replace('"manga", "music", "podcast"', '"manga", "podcast"')
-  .replace("restricted pages (about:, web store, PDFs)", "restricted pages (chrome://, web store, PDFs)");
-assert.equal(normalizedFirefoxJs, chromeJs, "Firefox popup JavaScript may differ only by selectable Music, browser API names, and restricted-page wording.");
-
-for (const icon of ["icon16.png", "icon48.png", "icon128.png", "logo.png"]) {
-  const chromeIcon = await readFile(join(ROOT, "chrome-nightly/icons", icon));
-  const firefoxIcon = await readFile(join(ROOT, "firefox-extension/icons", icon));
-  assert.deepEqual(firefoxIcon, chromeIcon, `${icon} must match Chrome Nightly.`);
-}
-
-const chromeManifest = JSON.parse(await readFile(join(ROOT, "chrome-nightly/manifest.json"), "utf8"));
-const firefoxManifest = JSON.parse(await readFile(join(ROOT, "firefox-extension/manifest.json"), "utf8"));
-delete chromeManifest.key;
-delete firefoxManifest.browser_specific_settings;
-assert.deepEqual(firefoxManifest, chromeManifest, "Firefox manifest may differ only by Chrome key and Gecko settings.");
-
 const chromeValidator = await loadBackupValidator(join(ROOT, "chrome-nightly/popup.js"), "chrome");
-const firefoxValidator = await loadBackupValidator(join(ROOT, "firefox-extension/popup.js"), "browser");
 const backup = process.env.MEDIA_LOG_BACKUP_PATH
   ? JSON.parse(await readFile(process.env.MEDIA_LOG_BACKUP_PATH, "utf8"))
   : syntheticBackup();
 const expectedEntryCount = (backup.data.currentWeek?.entries?.length || 0)
   + backup.data.history.reduce((total, week) => total + (week.entries?.length || 0), 0);
 
-for (const [label, validator] of [["Chrome Nightly", chromeValidator], ["Firefox", firefoxValidator]]) {
+for (const [label, validator] of [["Nightly", chromeValidator]]) {
   const data = validator.validateBackup(backup);
   assert.equal(validator.countBackupEntries(data), expectedEntryCount, `${label} should preserve every backup entry.`);
   assert.deepEqual(validator.verifyPortableStorage(data, structuredClone(data)), data, `${label} should accept an exact storage read-back.`);
@@ -174,4 +138,4 @@ for (const [label, validator] of [["Chrome Nightly", chromeValidator], ["Firefox
   assert.throws(() => validator.validateBackup(unsafeBackup), /HTTP or HTTPS/, `${label} should reject unsafe URL schemes.`);
 }
 
-console.log("Chrome Nightly and Firefox parity checks passed.");
+console.log(`Nightly backup checks passed: ${expectedEntryCount} entries preserved; truncated data and unsafe URLs rejected.`);

@@ -2,7 +2,7 @@ import { existsSync } from "node:fs";
 import { join } from "node:path";
 
 const ROOT = new URL("..", import.meta.url).pathname;
-const EXTENSION_DIR = join(ROOT, "chrome-stable");
+const EXTENSION_DIR = join(ROOT, "chrome-nightly");
 const manifest = await Bun.file(join(EXTENSION_DIR, "manifest.json")).json();
 const errors = [];
 
@@ -24,21 +24,18 @@ for (const field of ["name", "version", "description", "action", "icons"]) {
 
 const permissions = manifest.permissions || [];
 for (const permission of permissions) {
-  if (!["storage", "activeTab", "scripting"].includes(permission)) {
+  if (!["storage", "tabs", "activeTab", "scripting", "clipboardWrite"].includes(permission)) {
     errors.push(`Unexpected required permission: ${permission}`);
   }
 }
 
-if (manifest.host_permissions?.length) {
-  errors.push("Chrome release must not have required host_permissions.");
-}
-
-const optionalHosts = manifest.optional_host_permissions || [];
-for (const host of optionalHosts) {
-  if (!["https://*.supabase.co/*", "http://127.0.0.1/*", "http://localhost/*"].includes(host)) {
-    errors.push(`Unexpected optional host permission: ${host}`);
+for (const host of manifest.host_permissions || []) {
+  if (!["http://127.0.0.1:43187/*", "http://localhost:43187/*"].includes(host)) {
+    errors.push(`Unexpected host permission: ${host}`);
   }
 }
+if (manifest.optional_host_permissions?.length) errors.push("Nightly does not use optional host permissions.");
+if (!manifest.key) errors.push("Keep Nightly's manifest key so its extension ID and stored data stay linked.");
 
 requireFile(manifest.action?.default_popup || "");
 for (const iconPath of Object.values(manifest.icons || {})) {
@@ -49,14 +46,8 @@ for (const iconPath of Object.values(manifest.action?.default_icon || {})) {
 }
 
 const sourceFiles = ["manifest.json", "popup.html", "popup.css", "popup.js", "media-metadata.js"];
-const bridgePatterns = ["43187", "publish:bridge", "Publish to Website"];
 for (const file of sourceFiles) {
-  const text = await Bun.file(join(EXTENSION_DIR, file)).text();
-  for (const pattern of bridgePatterns) {
-    if (text.includes(pattern)) {
-      errors.push(`${file} still contains release-blocked bridge text: ${pattern}`);
-    }
-  }
+  requireFile(file);
 }
 
 if (errors.length > 0) {
@@ -64,4 +55,4 @@ if (errors.length > 0) {
   process.exit(1);
 }
 
-console.log("Chrome extension manifest and release source checks passed.");
+console.log("Nightly manifest and source checks passed.");

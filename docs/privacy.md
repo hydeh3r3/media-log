@@ -1,81 +1,21 @@
-# Privacy Policy
+# Privacy
 
-Media Log stores personal media entries.
+Media Log Nightly stores titles, URLs, dates, ratings, notes, weekly history, drafts, your name, and your theme in the browser profile.
 
-Entries may include:
+It reads the active tab's title and URL to fill the form. It may read headings and structured media details on that page to suggest a media type. These rules run on your device. Page content is not sent to an AI service.
 
-- titles
-- URLs
-- dates
-- ratings
-- notes
+Media Log does not read your full browser history. It does not use analytics or sell user data. It does not use user data for ads.
 
-By default, data is stored in the browser only.
+## Exports and Publishing
 
-When sync is enabled, the extension sends the saved media log to the sync endpoint the user entered. The same endpoint is used by the iOS app.
+Export All Data downloads a JSON backup to your computer. Import Backup reads a file you choose and replaces Media Log data in that browser profile.
 
-## Data Media Log Handles
+Publish to Website sends the chosen week's entries to your local website bridge on port 43187. The bridge may then publish them through your website project. This happens when you choose to publish.
 
-Media Log may handle:
+## Keep Data Safe
 
-- media entries written by the user
-- active tab title and URL when the user saves the current page
-- page headings and media details used to fill a new entry
-- Supabase account email
-- Supabase session tokens
-- local dev sync token, if the user enters one
-- Stripe payment reference IDs for paid sync
+Keep personal exports, browser storage, and local data files outside Git. The existing `.local-sync/` folder stays ignored.
 
-Media Log does not read full browser history.
+Use Reload to update the same extension install. Keep its manifest key and folder path. Removing the extension can remove its stored data.
 
-Media Log does not track browsing in the background.
-
-Media Log does not collect card numbers or card details.
-
-## How Data Is Used
-
-Media Log uses data to:
-
-- save the user's media log
-- prefill a new entry from the active tab
-- keep weekly history
-- sign in to Supabase
-- sync with the iOS app
-- unlock paid sync after payment
-
-The app does not collect analytics, ads, or tracking data.
-
-Media Log does not sell user data.
-
-Media Log does not use user data for ads.
-
-Media Log does not use user data to decide credit or lending eligibility.
-
-Secrets and local exports must not be committed. Keep `.env`, local sync files, database files, and browser storage exports ignored.
-
-Production sync signs in through Supabase Auth. The clients can also request sign-up and password reset emails. They store a Supabase session, not the account password.
-
-The iOS app stores the session in Keychain. The local media log JSON file should not contain sync credentials.
-
-The Chrome extension stores the session in extension storage. The Supabase service key belongs only in Supabase function secrets.
-
-Paid sync uses a PostgreSQL entitlement row. Stripe handles checkout and card storage. The repo stores sync status and Stripe references, not card data.
-
-## Data Sharing
-
-Media Log sends data only when needed for a user-chosen feature:
-
-- Supabase receives account and media log data for production sync.
-- Stripe receives checkout data for the optional `$2` sync unlock.
-- A local dev sync endpoint receives media log data only when the user enters that endpoint.
-- On iOS, entering a URL in a new entry sends a page request to that website to find its media type. The site sees the requested URL and normal connection details, such as the device's IP address. The lookup uses no saved cookies and does not run page scripts. Titles remain manually entered.
-
-Media-type rules run on the device. Page content is not sent to an AI service.
-
-## Security
-
-Production sync uses HTTPS.
-
-Server secrets belong only in Supabase function secrets.
-
-Do not paste service keys or Stripe secret keys into Chrome, Firefox, Zen, or iOS.
+See [Install and Test](install-test.md) for the full backup steps.

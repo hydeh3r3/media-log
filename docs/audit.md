@@ -1,133 +1,31 @@
-# Media Log Repo Audit
+# Nightly Project Audit
 
-Date: 2026-05-26
+Date: 2026-10-25
 
-## Repo Shape
+## Active App
 
-The repo has four main areas:
+The only app source is `chrome-nightly/`. Its manifest, key, popup, styles, icons, backup format, and website bridge stay in place.
 
-- `chrome-stable`: the Chrome Manifest V3 popup.
-- `firefox-extension`: the Firefox and Zen copy of the popup.
-- `shared`: sync protocol notes.
-- `iphone-app`: the SwiftUI companion app package.
-- `supabase`: the production sync database and Edge Function.
+Metadata source lives in `shared/media-metadata.js`. The copy inside Nightly must match it.
 
-The Chrome extension is the main product target. The Firefox folder is useful for Zen, but it is not the official store target for this goal.
+## Data Boundary
 
-As of 2026-08-06, the Firefox and Zen copy matches Chrome Nightly. It uses Firefox `browser.*` APIs, keeps the local Gecko ID, uses the website publish bridge, and supports full backup export and import.
+Logs live in browser extension storage. This cleanup changes project files only. It keeps browser data, existing backups, Git history, and the ignored `.local-sync/` data.
 
-## Current Chrome Extension
+The removed project files have a recovery copy outside the repo.
 
-The Chrome extension is a single popup app.
+## Checks
 
-It has these tabs:
+- Nightly syntax and manifest checks.
+- Metadata examples and active-tab form checks.
+- Full backup validation and exact storage comparison.
+- Safe URL rejection and missing-history detection.
+- Local doc links, script paths, and project layout.
 
-- Add
-- This Week
-- History
-- Sync
+Run `bun run verify`. No check opens or writes a live browser profile.
 
-It stores all user data in `chrome.storage.local`.
+## Publishing
 
-Current storage keys:
+Website publishing still uses the website project's local bridge on port 43187. Media Log does not deploy that bridge.
 
-- `currentWeek`
-- `history`
-- `addDraft`
-- `syncConfig`
-- `syncSession`
-- `syncState`
-- `syncTombstones`
-
-The popup can prefill the URL and title from the active tab. It also guesses the media type from the page URL and title.
-
-## Data Model
-
-The week shape is:
-
-- `weekStart`
-- `weekEnd`
-- `weekNumber`
-- `year`
-- `entries`
-
-Each entry has:
-
-- `type`
-- `title`
-- `date`
-- `createdAt`
-- `updatedAt`
-- `id`
-- `url`, optional
-- `rating`, optional
-- `note`, optional
-
-Old Chrome Stable entries are prepared for sync by adding stable IDs and edit timestamps. The migration UI reports counts only. The migration smoke test checks Chrome Stable with synthetic private-looking data and makes sure titles, URLs, and notes stay out of the report. A separate parity test checks the Chrome Nightly and Firefox full backup flow.
-
-## Current Permissions
-
-The old Chrome manifest used:
-
-- `storage`
-- `tabs`
-- `clipboardWrite`
-- local bridge host permissions
-
-The release manifest now uses:
-
-- `storage`
-- `activeTab`
-- optional host permission only for Supabase or a local sync endpoint
-
-The extension does not use clipboard access today, so `clipboardWrite` should not ship.
-
-## Publishing Gaps
-
-The extension now has:
-
-- tighter permissions
-- a privacy note
-- store listing copy
-- screenshot and small promotional image assets
-- Chrome Web Store privacy form answers
-- a repeatable release package command
-- release zip content verification
-- no local website bridge code in the release package
-- a sync path that also works for iOS
-
-Manual store work still remains:
-
-- answer the Chrome Web Store privacy form with `docs/chrome-web-store-privacy.md`
-- upload the release zip
-
-## iOS App
-
-The iOS folder now contains an Xcode project with a SwiftUI app. It has:
-
-- list, add, edit, and delete entry views
-- editable archived history
-- local persistence
-- sync settings
-- cloud sync with the same data model as Chrome
-- Supabase email/password sign-in
-- Keychain storage for the iOS sync session
-- iPhone and iPad app icon assets
-- release-readiness checks for metadata, icons, and credential storage
-
-It still needs a developer team set in Xcode before device install, TestFlight, or App Store submission.
-
-Before App Store review, choose the paid-sync route for iOS. The current personal build can open Stripe Checkout for the `$2` sync unlock. Store submission may need StoreKit, an allowed external purchase route, or no in-app purchase call to action. The checklist lives in `docs/app-store.md`.
-
-## Sync Path
-
-The repo now has two sync paths:
-
-- Local dev: `scripts/sync-dev-server.js`
-- Production: `supabase/functions/media-log-sync/index.ts`
-
-The production path uses Supabase Auth, a row owned by the signed-in user, row-level security, and a server-side merge before write.
-
-`bun run verify` now runs safe migration, Stripe webhook, and local sync smoke tests. The migration test checks count-only reports. The sync smoke test starts the local sync server on a temporary port, writes one synthetic entry, then simulates two offline clients and verifies their snapshots merge instead of overwriting each other. It deletes the temporary file at the end.
-
-Production sync is gated by a `$2` PostgreSQL entitlement row in `media_log_sync_entitlements`. Stripe Checkout creates the payment session, and a Stripe webhook activates the entitlement after payment.
+See [Install and Test](install-test.md) and [Privacy](privacy.md).

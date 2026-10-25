@@ -1,232 +1,55 @@
-# Install And Test Guide
+# Install and Test Nightly
 
-Use this guide when you want to try Media Log on Chrome, Firefox or Zen, and iOS.
+Nightly works as an unpacked extension in Chromium browsers such as Chrome, Arc, and Helium.
 
-Run the full local check first:
+## Install
+
+1. Open `chrome://extensions` in the browser you want to use.
+2. Enable Developer mode.
+3. Click Load unpacked.
+4. Choose `/Users/wetbrain/Documents/workspace/media-log/chrome-nightly`.
+5. Pin Media Log if you want a toolbar button.
+
+Each browser profile has its own data. Installing the same folder does not copy your logs from another browser.
+
+## Reload an Existing Install
+
+Open `chrome://extensions` and click Reload for Media Log. Keep the same folder and manifest key. Do not remove and reinstall the extension as an update step.
+
+## Save or Move All Data
+
+1. Open Media Log and its Settings.
+2. Choose Export All Data.
+3. Save the JSON file outside the repo.
+4. In the destination browser, open Media Log Settings.
+5. Choose Import Backup. This opens the transfer page.
+6. Choose Import Backup again and select the full backup file.
+7. Check the verified total, archived weeks, and current-week entry count.
+8. Export from the destination and compare it with the source backup.
+
+Import replaces that profile's Media Log data. Export a destination backup first if it has entries you want to keep.
+
+The full backup includes the current week, history, draft when present, name, and theme. A single-week export is not a full backup.
+
+## Check the Code
+
+Use Bun:
 
 ```sh
+bun run sync:media-metadata
 bun run verify
 ```
 
-That command checks the Chrome package, Firefox source and lint, Chrome Nightly parity, Supabase backend files, safe migration flow, Stripe webhook rules, local sync merge flow, iOS simulator build, and iOS release readiness.
+Verification checks Nightly's JavaScript, manifest, title and type rules, form behavior, backup format, and docs. It uses test data and does not write to browser profiles.
 
-It also checks the shared title and type rules across the browser builds. See [Media Detection and Title Capture](media-detection-notes.md) for examples and how to try the changes.
+## Check the Popup
 
-## Chrome Development Install
+Open a content page and then Media Log. Check the title, URL, type, and date. Change the title or type while a page lookup is pending; your edit should stay.
 
-Load this folder:
+Use a test browser profile if you want to add or remove sample entries.
 
-```text
-/Users/wetbrain/Documents/workspace/media-log/chrome-stable
-```
+## Publish a Week
 
-Steps:
+Start the website project's local publish bridge on port 43187. Then use Publish to Website for the chosen week. Media Log keeps the week locally if the bridge is not running.
 
-1. Open `chrome://extensions`.
-2. Turn on Developer mode.
-3. Click `Load unpacked`.
-4. Pick the folder above.
-5. Pin Media Log in the toolbar.
-
-Use the Sync tab to prepare old browser data, sign in, unlock paid sync, and sync.
-
-## Chrome Release Package
-
-Build the Chrome Web Store zip:
-
-```sh
-bun run package:chrome
-```
-
-The zip is written to `dist/`.
-
-The package check only allows extension files in the zip. It blocks local sync files, browser storage exports, Supabase code, scripts, and secret-looking values.
-
-Build the Chrome Web Store image assets:
-
-```sh
-bun run build:chrome-store-assets
-```
-
-The generated screenshots and small promotional image live in `store-assets/chrome/`.
-
-The screenshots are `1280x800`.
-
-The small promotional image is `440x280`.
-
-Manual Chrome Web Store work still remains:
-
-- upload the zip
-- add screenshots
-- add the small promotional image
-- answer the privacy form with `docs/chrome-web-store-privacy.md`
-- review the store listing text in `docs/chrome-web-store.md`
-
-## Firefox And Zen Install
-
-Zen uses the Firefox extension folder as a temporary add-on. This copy matches Chrome Nightly and uses the local website publish bridge.
-
-Load this manifest:
-
-```text
-/Users/wetbrain/Documents/workspace/media-log/firefox-extension/manifest.json
-```
-
-Steps:
-
-1. Open Zen.
-2. Go to `about:debugging#/runtime/this-firefox`.
-3. Click `Load Temporary Add-on`.
-4. Pick the manifest file above.
-5. Open the Media Log toolbar button.
-
-Temporary add-ons unload when Zen restarts. Reload the manifest from `about:debugging` after a restart. Media Log data stays in the Zen profile.
-
-If a pinned Media Log button expands the sidebar, see the [Zen sidebar fix](zen-sidebar-fix.md). This is a Zen toolbar style issue, not popup CSS.
-
-To move all Chrome Nightly data into Zen:
-
-1. Open the Media Log toolbar button.
-2. Click the gear button.
-3. Click `Import Backup` under Data Transfer.
-4. Media Log opens a full transfer tab. Click `Import Backup` again in that tab.
-5. Pick the full backup JSON file.
-6. Wait for the green `Verified` message. It lists the saved weeks and entry counts.
-7. Close the transfer tab. Open History and check the weeks.
-
-The full tab stays open while Zen shows the file picker. After the write, Media Log reads the data back and checks it before showing `Verified`.
-
-The import replaces only Media Log data in Zen. It does not copy cookies, passwords, or normal browser history.
-
-Check the Firefox and Zen source with:
-
-```sh
-bun run check:firefox
-bun run check:firefox-parity
-bun run lint:firefox
-```
-
-## iOS Install
-
-Open the Xcode project:
-
-```text
-/Users/wetbrain/Documents/workspace/media-log/iphone-app/MediaLog.xcodeproj
-```
-
-Build the simulator target with:
-
-```sh
-bun run check:ios
-```
-
-Run the release-readiness check with:
-
-```sh
-bun run check:ios-release
-```
-
-To install on a real iPhone, set your Apple developer team on the `MediaLog` target in Xcode. Then build and run from Xcode.
-
-App Store and TestFlight notes live in `docs/app-store.md`.
-
-## Local Dev Sync
-
-Start the local sync server:
-
-```sh
-bun run sync:dev
-```
-
-Use these settings in Chrome Stable and iOS:
-
-- Mode: `Local dev`
-- Endpoint: `http://127.0.0.1:43189`
-- User ID: `personal`
-- Token: `dev-media-log-token`
-
-Local dev sync is for testing only. It is not pay gated. It writes files under `.local-sync/`, which is ignored by git.
-
-Run the local merge smoke test with:
-
-```sh
-bun run check:sync
-```
-
-## Production Sync
-
-Production sync uses Supabase, which stores data in PostgreSQL.
-
-Deploy with:
-
-```sh
-bun run supabase:deploy
-```
-
-Production sync requires:
-
-- a Supabase project
-- Supabase Auth email/password sign-in
-- Supabase Auth redirect URLs for password reset
-- the `media_log_records` PostgreSQL table
-- the `media_log_sync_entitlements` PostgreSQL table
-- the `media-log-sync` Edge Function
-- the `media-log-checkout` Edge Function
-- the `media-log-stripe-webhook` Edge Function
-
-Set these Supabase function secrets before paid checkout:
-
-- `STRIPE_SECRET_KEY`
-- `STRIPE_WEBHOOK_SECRET`
-- `MEDIA_LOG_CHECKOUT_SUCCESS_URL`
-- `MEDIA_LOG_CHECKOUT_CANCEL_URL`
-
-Never put a Supabase service key, Stripe secret key, or webhook secret in Chrome, Firefox, Zen, or iOS.
-
-## Paid Sync
-
-Cross-device sync is a `$2` unlock.
-
-The unlock lives in PostgreSQL:
-
-```text
-public.media_log_sync_entitlements
-```
-
-The client opens Stripe Checkout after sign-in. The Stripe webhook writes the paid entitlement row after payment succeeds.
-
-The Supabase sync function checks the signed-in user and the PostgreSQL entitlement row before it reads or writes sync data. If the row is missing or inactive, sync returns `402 Payment Required`.
-
-Check the safe webhook rules with:
-
-```sh
-bun run check:stripe
-```
-
-## Migration
-
-In the browser extension, open the Sync tab and click `Prepare Local Data`.
-
-This adds missing IDs and timestamps to old entries. It reports counts only. It does not print titles, URLs, or notes.
-
-After that, sign in, unlock paid sync, and click `Sync Now`.
-
-Check the safe migration flow with:
-
-```sh
-bun run check:migration
-```
-
-## Manual Steps Left
-
-These steps still need live accounts, private browser data, or store access:
-
-- create and link the real Supabase project
-- set Stripe checkout and webhook secrets in Supabase
-- set Supabase Auth redirect URLs
-- choose the App Store paid-sync route before App Review
-- run the real browser-data migration from your installed extension
-- pay through Stripe Checkout or add your manual entitlement row
-- upload the Chrome release zip to the Chrome Web Store
-- answer the Chrome Web Store privacy form with `docs/chrome-web-store-privacy.md`
-- set the Apple developer team before installing on a real iPhone
+See [Title and Type Rules](media-detection-notes.md) and [Privacy](privacy.md).

@@ -1,4 +1,4 @@
-/* Shared by the three extensions and iOS JavaScriptCore. No page code is evaluated. */
+/* Media metadata for Nightly. No page code is evaluated. */
 (function (root) {
   "use strict";
   const text = (value) => typeof value === "string" ? value.slice(0, 5000).replace(/\s+/g, " ").trim() : "";
@@ -20,7 +20,7 @@
   const youtubeDomains = ["youtube.com", "youtu.be", "youtube-nocookie.com"];
   const animeDomains = ["anikoto.cz", "anikoto.com", "anikototv.to", "crunchyroll.com", "hidive.com", "animepahe.com", "animepahe.pw", "funimation.com"];
   const mangaDomains = ["mangadex.org", "mangaplus.shueisha.co.jp", "mangafire.to", "mangafreak.me", "manga4life.com", "manganato.com", "comick.io", "comick.dev", "webtoons.com"];
-  // Absolute HTTP(S) URLs only. This also runs in JavaScriptCore, which has no DOM URL class.
+  // Absolute HTTP(S) URLs only.
   function parseURL(raw) {
     const match = text(raw).match(/^(https?):\/\/([^/?#\s]+)([^?#\s]*)(?:\?([^#]*))?/i);
     if (!match || match[2].includes("@")) return null;
@@ -126,6 +126,7 @@
         .replace(/\s+Anime\s+English\s+SUB\/DUB\s+-\s+Anikoto\s*$/i, "");
     }
     else if (onAny(page.host, youtubeDomains)) title = rawTitle.replace(/\s+-\s+YouTube\s*$/i, "");
+    else if (onDomain(page.host, "mangaplus.shueisha.co.jp")) title = rawTitle.replace(/\s+[|-]\s+MANGA\s+Plus\s*$/i, "");
     const entity = selectEntity(signals, input.url || signals.url);
     return { title, ...typeForPage(page, signals, entity, rawTitle) };
   }
@@ -154,112 +155,5 @@
     };
   }
 
-  // Static HTML reader for iOS. It extracts data only; scripts and resources never run.
-  // One forward pass keeps hostile markup from slowing it down: as in a browser, an
-  // unclosed comment, tag, quoted value, script, style, or title runs to the end.
-  function signalsFromHTML(html, url = "") {
-    const source = typeof html === "string" ? html.slice(0, 2000000) : "";
-    const entities = { amp: "&", quot: '"', apos: "'", lt: "<", gt: ">", nbsp: " ", ndash: "–", mdash: "—", rsquo: "’", lsquo: "‘", hellip: "…", colon: ":", copy: "©" };
-    const decode = (value) => value.replace(/&(#x[0-9a-f]+|#\d+|[a-z]+);/gi, (whole, entity) => {
-      if (!entity.startsWith("#")) return entities[entity.toLowerCase()] ?? whole;
-      const code = entity[1].toLowerCase() === "x" ? parseInt(entity.slice(2), 16) : Number(entity.slice(1));
-      return code > 0 && code <= 0x10ffff && !(code >= 0xd800 && code <= 0xdfff) ? String.fromCodePoint(code) : whole;
-    });
-    const isSpace = (char) => char === " " || char === "\n" || char === "\t" || char === "\r" || char === "\f";
-    const skipSpaces = (index) => { while (isSpace(source[index])) index++; return index; };
-    // Reads attributes up to the tag's ">"; a repeated name keeps its first value. Null if the tag never ends.
-    const readTag = (index) => {
-      const attrs = Object.create(null);
-      while (index < source.length) {
-        if (source[index] === ">") return { attrs, end: index + 1 };
-        if (isSpace(source[index]) || source[index] === "/") { index++; continue; }
-        const nameStart = index++;
-        while (index < source.length && !isSpace(source[index]) && !"/>=".includes(source[index])) index++;
-        const name = source.slice(nameStart, index).toLowerCase();
-        let value = "";
-        index = skipSpaces(index);
-        if (source[index] === "=") {
-          index = skipSpaces(index + 1);
-          const quote = source[index];
-          if (quote === '"' || quote === "'") {
-            const close = source.indexOf(quote, index + 1);
-            if (close < 0) return null;
-            value = source.slice(index + 1, close);
-            index = close + 1;
-          } else {
-            const valueStart = index;
-            while (index < source.length && !isSpace(source[index]) && source[index] !== ">") index++;
-            value = source.slice(valueStart, index);
-          }
-        }
-        if (!(name in attrs)) attrs[name] = decode(value);
-      }
-      return null;
-    };
-    const wanted = new Set(["script", "style", "title", "h1", "meta", "link", "article", "video"]);
-    // Script, style, and title text, and an h1's inner markup as before, are read up to the close tag.
-    const closers = { script: /<\/script[\t\n\f\r />]/gi, style: /<\/style[\t\n\f\r />]/gi, title: /<\/title[\t\n\f\r />]/gi, h1: /<\/h1[\t\n\f\r />]/gi };
-    const result = { url, title: "", meta: {}, jsonLd: [], headings: [], hasArticle: false, hasVideo: false };
-    let index = 0;
-    let count = 0;
-    let jsonBytes = 0;
-    let h1Closes = true;
-    while (index < source.length) {
-      const open = source.indexOf("<", index);
-      if (open < 0) break;
-      if (source.startsWith("<!--", open)) {
-        if (++count > 2000) break;
-        const close = source.indexOf("-->", open + 4);
-        if (close < 0) break;
-        index = close + 3;
-        continue;
-      }
-      const endTag = source[open + 1] === "/";
-      const nameStart = open + (endTag ? 2 : 1);
-      if (!/[a-z]/i.test(source[nameStart] || "")) {
-        // A bare "<" is text. Doctypes, "<?", and other "<!" or "</" markup end at the next ">".
-        if (!endTag && source[open + 1] !== "!" && source[open + 1] !== "?") { index = open + 1; continue; }
-        const close = source.indexOf(">", open + 2);
-        if (close < 0) break;
-        index = close + 1;
-        continue;
-      }
-      let nameEnd = nameStart;
-      while (nameEnd < source.length && !isSpace(source[nameEnd]) && source[nameEnd] !== "/" && source[nameEnd] !== ">") nameEnd++;
-      const tag = source.slice(nameStart, nameEnd).toLowerCase();
-      const parsed = readTag(nameEnd);
-      if (!parsed) break;
-      index = parsed.end;
-      if (endTag || !wanted.has(tag)) continue;
-      if (++count > 2000) break;
-      const attrs = parsed.attrs;
-      let content = null;
-      if (closers[tag] && (tag !== "h1" || h1Closes)) {
-        closers[tag].lastIndex = index;
-        const close = closers[tag].exec(source);
-        const closeTag = close && readTag(close.index + tag.length + 2);
-        if (closeTag) {
-          content = source.slice(index, close.index);
-          index = closeTag.end;
-        } else if (tag === "h1" && !close) h1Closes = false; // Later h1 tags cannot close either.
-        else break;
-      }
-      if (tag === "script" && attrs.type?.toLowerCase() === "application/ld+json") {
-        jsonBytes += content.length;
-        if (content.length <= 200000 && jsonBytes <= 500000 && result.jsonLd.length < 32) {
-          try { result.jsonLd.push(JSON.parse(content)); } catch { /* Ignore malformed JSON. */ }
-        }
-      } else if (tag === "title" && !result.title) result.title = text(decode(content));
-      else if (tag === "h1" && content !== null && result.headings.length < 4) result.headings.push(text(decode(content.replace(/<[^<>]*>/g, ""))));
-      else if (tag === "meta") {
-        const name = text(attrs.property || attrs.name).toLowerCase();
-        if (/^(?:og:|twitter:|article:|book:|music:)/.test(name)) result.meta[name] = text(attrs.content);
-      } else if (tag === "link" && attrs.rel === "canonical") result.canonical = attrs.href;
-      else if (tag === "article") result.hasArticle = true;
-      else if (tag === "video") result.hasVideo = true;
-    }
-    return result;
-  }
-
-  root.MediaLogMetadata = Object.freeze({ detect, collectPageSignals, signalsFromHTML });
+  root.MediaLogMetadata = Object.freeze({ detect, collectPageSignals });
 })(globalThis);
