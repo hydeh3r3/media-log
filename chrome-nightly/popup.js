@@ -922,8 +922,17 @@ async function renderHistory() {
       const dayBody = document.createElement("div");
       dayBody.className = "day-group-body";
       for (const entry of dayGroups.get(date)) {
-        const item = createEntryItem(entry);
-        item.appendChild(createTextElement("div", "entry-meta", getEntryMeta(entry)));
+        const item = entry.note ? document.createElement("details") : createEntryItem(entry);
+        const meta = createTextElement("div", "entry-meta", getEntryMeta(entry));
+        if (entry.note) {
+          item.className = "entry-item history-note";
+          const heading = document.createElement("summary");
+          heading.append(createTextElement("span", "entry-title", entry.title), meta);
+          item.append(
+            heading,
+            createTextElement("div", "entry-note", entry.note),
+          );
+        } else item.appendChild(meta);
         dayBody.appendChild(item);
       }
 

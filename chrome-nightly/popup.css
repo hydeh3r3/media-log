@@ -457,7 +457,7 @@ button.secondary-action:hover {
 
 /* Grid columns: arrow, title, Publish. The publish message spans a second row
    under the title, so it stays beside the button whether or not the week is open. */
-.history-week summary {
+.history-week > summary {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
@@ -479,7 +479,7 @@ button.secondary-action:hover {
   display: none;
 }
 
-.history-week summary::-webkit-details-marker {
+.history-week > summary::-webkit-details-marker {
   display: none;
 }
 
@@ -518,19 +518,43 @@ button.secondary-action:hover {
   padding: 0 12px 12px;
 }
 
-.history-week summary::before {
+.history-week > summary::before {
   content: "\25B6 ";
   font-size: 10px;
   color: var(--muted);
   margin-right: 6px;
 }
 
-.history-week[open] summary::before {
+.history-week[open] > summary::before {
   content: "\25BC ";
 }
 
 .history-week .history-entries {
   padding: 8px 10px;
+}
+
+.history-note > summary {
+  cursor: pointer;
+}
+
+.history-note > summary::marker {
+  color: var(--muted);
+  font-size: 10px;
+}
+
+.history-note > summary:hover .entry-title {
+  color: var(--accent-hover);
+}
+
+.history-note > summary:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+  border-radius: 2px;
+}
+
+.history-note .entry-note {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 
 .history-actions {
