@@ -41,6 +41,25 @@ async function setup(directory, { title = "", url = "", type = "article", delaye
 }
 
 for (const directory of ["chrome-nightly"]) {
+  const anikotoBzTab = { id: 15, url: "https://anikototv.bz/watch/draw-this-then-die-5xdt/ep-2", title: "Watch Draw This, Then Die! Episode 2 Anime Online | Anikoto" };
+  for (const rejected of [false, true]) {
+    const onlineAnime = await setup(directory, { tab: anikotoBzTab, rejected });
+    await onlineAnime.prefill();
+    assert.equal(onlineAnime.element("entry-title").value, "Draw This, Then Die! Episode 2");
+    assert.equal(onlineAnime.element("entry-type").value, "anime");
+  }
+  const onlineEdited = await setup(directory, { tab: anikotoBzTab, delayed: true });
+  const onlineLoading = onlineEdited.prefill();
+  await Promise.resolve();
+  assert.equal(onlineEdited.element("entry-title").value, "Draw This, Then Die! Episode 2", "AnikotoTV bz cleanup must not wait for page metadata");
+  onlineEdited.element("entry-title").value = "My anime episode title";
+  onlineEdited.element("entry-title").dispatch("input");
+  onlineEdited.release();
+  await onlineLoading;
+  assert.equal(onlineEdited.element("entry-title").value, "My anime episode title");
+  const onlineDraft = await setup(directory, { tab: anikotoBzTab, title: "My saved title | Anikoto", url: anikotoBzTab.url });
+  await onlineDraft.prefill();
+  assert.equal(onlineDraft.element("entry-title").value, "My saved title | Anikoto");
   const anikotoTab = { id: 14, url: "https://anikototv.to/watch/tokyo-revengers/episode-2", title: "Watch Tokyo Revengers: War of the Three Titan Arc Episode 2 Anime English SUB/DUB - Anikoto" };
   const anikoto = await setup(directory, { tab: anikotoTab, rejected: true });
   await anikoto.prefill();

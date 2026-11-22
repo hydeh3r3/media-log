@@ -18,7 +18,8 @@
     "music.song": "music", "music.album": "music", "music.playlist": "music", book: "book", "books.book": "book",
   };
   const youtubeDomains = ["youtube.com", "youtu.be", "youtube-nocookie.com"];
-  const animeDomains = ["anikoto.cz", "anikoto.com", "anikototv.to", "crunchyroll.com", "hidive.com", "animepahe.com", "animepahe.pw", "funimation.com"];
+  const anikotoTvDomains = ["anikototv.to", "anikototv.bz"];
+  const animeDomains = ["anikoto.cz", "anikoto.com", ...anikotoTvDomains, "crunchyroll.com", "hidive.com", "animepahe.com", "animepahe.pw", "funimation.com"];
   const mangaDomains = ["mangadex.org", "mangaplus.shueisha.co.jp", "mangafire.to", "mangafreak.me", "manga4life.com", "manganato.com", "comick.io", "comick.dev", "webtoons.com"];
   // Absolute HTTP(S) URLs only.
   function parseURL(raw) {
@@ -121,9 +122,9 @@
     else if (/(?:^|\.)mangafreak\.[a-z]{2,}$/.test(page.host)) {
       title = rawTitle.replace(/^\s*Read\s+/i, "").replace(/\s+-\s+MangaFreak\s*$/i, "");
     }
-    else if (onDomain(page.host, "anikototv.to")) {
+    else if (onAny(page.host, anikotoTvDomains)) {
       title = rawTitle.replace(/^\s*Watch\s+/i, "")
-        .replace(/\s+Anime\s+English\s+SUB\/DUB\s+-\s+Anikoto\s*$/i, "");
+        .replace(/\s+Anime\s+(?:English\s+SUB\/DUB\s+-|Online\s+\|)\s+Anikoto\s*$/i, "");
     }
     else if (onAny(page.host, youtubeDomains)) title = rawTitle.replace(/\s+-\s+YouTube\s*$/i, "");
     else if (onDomain(page.host, "mangaplus.shueisha.co.jp")) title = rawTitle.replace(/\s+[|-]\s+MANGA\s+Plus\s*$/i, "");

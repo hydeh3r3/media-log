@@ -8,7 +8,7 @@ Broad title cleanup has been reverted at the user's request. Only the site rules
 - On IMDb links, the trailing `- IMDb` label is removed. The movie name and year stay intact.
 - On AnimePahe `.com` and `.pw` links, the trailing `:: animepahe` label is removed.
 - On `mangafreak.<TLD>` links and their subdomains, the leading `Read ` and trailing `- MangaFreak` labels are removed. The manga name and chapter stay intact.
-- On `anikototv.to` links and its subdomains, the leading `Watch ` and trailing `Anime English SUB/DUB - Anikoto` labels are removed. The name and any season or episode text stay intact.
+- On `anikototv.to` and `anikototv.bz` links and their subdomains, the leading `Watch ` label is removed. The trailing `Anime English SUB/DUB - Anikoto` or `Anime Online | Anikoto` label is also removed. The name and any season or episode text stay intact.
 - On YouTube links, the trailing `- YouTube` label is removed. This also applies to short links, mobile pages, YouTube Music, and privacy embeds.
 - On MANGA Plus links, the trailing `| MANGA Plus` or `- MANGA Plus` label is removed. The chapter number and manga name stay intact.
 - Page headings and structured names do not replace that title.
@@ -36,6 +36,7 @@ This rollback also removes the recent punctuation conversion. If a page title co
 | --- | --- | --- |
 | Watch Show Name S02E03 Online \| Anikoto | Watch Show Name S02E03 Online \| Anikoto | Anime |
 | Watch Tokyo Revengers: War of the Three Titan Arc Episode 2 Anime English SUB/DUB - Anikoto | Tokyo Revengers: War of the Three Titan Arc Episode 2 | Anime |
+| Watch Draw This, Then Die! Episode 2 Anime Online \| Anikoto | Draw This, Then Die! Episode 2 | Anime |
 | Naruto: Shippuden - 24 :: animepahe | Naruto: Shippuden - 24 | Anime |
 | Primal Fear (1996) - IMDb | Primal Fear (1996) | Film |
 | Read One Piece Chapter 1195 - MangaFreak | One Piece Chapter 1195 | Manga |
