@@ -2,17 +2,25 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 
 const root = new URL("../", import.meta.url);
-const shared = await readFile(new URL("shared/media-metadata.js", root), "utf8");
-const engine = new Function("globalThis", `${shared}\nreturn globalThis.MediaLogMetadata;`)({});
+const loadGlobal = async (path, name) => {
+  const source = await readFile(new URL(path, root), "utf8");
+  return new Function("globalThis", `${source}\nreturn globalThis.${name};`)({});
+};
+const metadata = await loadGlobal("shared/media-metadata.js", "MediaLogMetadata");
+const core = await loadGlobal("chrome-nightly/core.js", "MediaLogCore");
+const popupSource = (await readFile(new URL("chrome-nightly/popup.js", root), "utf8")).replace(/\ninit\(\);\s*$/, "\n");
 
-async function setup(directory, { title = "", url = "", type = "article", delayed = false, rejected = false, tab: suppliedTab } = {}) {
+const DEFAULT_TAB = { id: 7, url: "https://anikoto.cz/watch/naruto/ep-24", title: "Watch Naruto: Shippuden Anime English SUB/DUB - Anikoto" };
+
+// Load popup.js against stub DOM and chrome APIs. `delayed` holds the page lookup until release().
+function setup({ title = "", url = "", type = "article", delayed = false, rejected = false, tab = DEFAULT_TAB } = {}) {
   const elements = new Map();
   const element = (id) => {
     if (!elements.has(id)) {
       const listeners = new Map();
       elements.set(id, {
         value: "", style: {}, dataset: {}, classList: { toggle() {} },
-        addEventListener(event, listener) { const group = listeners.get(event) || []; group.push(listener); listeners.set(event, group); },
+        addEventListener(event, listener) { listeners.set(event, [...(listeners.get(event) || []), listener]); },
         dispatch(event) { for (const listener of listeners.get(event) || []) listener({}); },
       });
     }
@@ -22,10 +30,10 @@ async function setup(directory, { title = "", url = "", type = "article", delaye
   element("entry-title").value = title;
   element("entry-url").value = url;
   element("entry-type").value = type;
-  const tab = suppliedTab || { id: 7, url: "https://anikoto.cz/watch/naruto/ep-24", title: "Watch Naruto: Shippuden Anime English SUB/DUB - Anikoto" };
+
   let resolveSignals;
   const pending = new Promise((resolve) => { resolveSignals = resolve; });
-  const signals = { url: tab.url, headings: suppliedTab ? [] : ["Naruto: Shippuden"], meta: {} };
+  const signals = { url: tab.url, headings: tab === DEFAULT_TAB ? ["Naruto: Shippuden"] : [], meta: {} };
   const api = {
     storage: { local: { set: async () => {}, get: async () => ({}) } },
     tabs: { query: async () => [tab] },
@@ -34,142 +42,149 @@ async function setup(directory, { title = "", url = "", type = "article", delaye
       return delayed ? pending : [{ result: signals }];
     } },
   };
-  const source = (await readFile(new URL(`${directory}/popup.js`, root), "utf8")).replace(/\ninit\(\);\s*$/, "\n");
-  const factory = new Function("document", "chrome", "browser", "localStorage", "MediaLogMetadata", `${source}\nreturn prefillFromTab;`);
-  const prefill = factory(document, api, api, { getItem: () => null }, engine);
-  return { element, prefill, release: () => resolveSignals([{ result: signals }]) };
+  const factory = new Function(
+    "document", "chrome", "localStorage", "MediaLogMetadata", "MediaLogCore",
+    `${popupSource}\nreturn { prefillFromTab, bindDraftFields };`,
+  );
+  const popup = factory(document, api, { getItem: () => null }, metadata, core);
+  popup.bindDraftFields();
+
+  const edit = (name, value, event = "input") => {
+    element(`entry-${name}`).value = value;
+    element(`entry-${name}`).dispatch(event);
+  };
+  const field = (name) => element(`entry-${name}`).value;
+  return { prefill: popup.prefillFromTab, edit, field, release: () => resolveSignals([{ result: signals }]) };
 }
 
-for (const directory of ["chrome-nightly"]) {
-  const anikotoBzTab = { id: 15, url: "https://anikototv.bz/watch/draw-this-then-die-5xdt/ep-2", title: "Watch Draw This, Then Die! Episode 2 Anime Online | Anikoto" };
-  for (const rejected of [false, true]) {
-    const onlineAnime = await setup(directory, { tab: anikotoBzTab, rejected });
-    await onlineAnime.prefill();
-    assert.equal(onlineAnime.element("entry-title").value, "Draw This, Then Die! Episode 2");
-    assert.equal(onlineAnime.element("entry-type").value, "anime");
+// Site rules: the cleaned title fills in before the page lookup, the type follows,
+// a manual edit during the lookup wins, and a saved draft title is left alone.
+const sites = [
+  {
+    name: "AnikotoTV .bz",
+    tab: { id: 15, url: "https://anikototv.bz/watch/draw-this-then-die-5xdt/ep-2", title: "Watch Draw This, Then Die! Episode 2 Anime Online | Anikoto" },
+    title: "Draw This, Then Die! Episode 2",
+    type: "anime",
+    lookups: [false, true],
+    manualTitle: "My anime episode title",
+    draftTitle: "My saved title | Anikoto",
+  },
+  {
+    name: "AnikotoTV",
+    tab: { id: 14, url: "https://anikototv.to/watch/tokyo-revengers/episode-2", title: "Watch Tokyo Revengers: War of the Three Titan Arc Episode 2 Anime English SUB/DUB - Anikoto" },
+    title: "Tokyo Revengers: War of the Three Titan Arc Episode 2",
+    type: "anime",
+    lookups: [true],
+    manualTitle: "My episode title",
+  },
+  {
+    name: "MangaFreak",
+    tab: { id: 13, url: "https://mangafreak.me/Read1_One_Piece_1195", title: "Read One Piece Chapter 1195 - MangaFreak" },
+    title: "One Piece Chapter 1195",
+    type: "manga",
+    lookups: [true],
+    manualTitle: "My chapter title",
+  },
+  {
+    name: "IMDb",
+    tab: { id: 12, url: "https://www.imdb.com/title/tt0117381/", title: "Primal Fear (1996) - IMDb" },
+    title: "Primal Fear (1996)",
+    type: "film",
+    lookups: [false, true],
+    manualTitle: "My movie title - IMDb",
+    draftTitle: "My saved title - IMDb",
+  },
+  ...["animepahe.com", "animepahe.pw"].map((domain) => ({
+    name: `AnimePahe ${domain}`,
+    tab: { id: 11, url: `https://${domain}/play/example`, title: "Psyren Ep. 1 :: animepahe" },
+    title: "Psyren Ep. 1",
+    type: "anime",
+    lookups: [true],
+    manualTitle: "My anime title",
+  })),
+];
+
+for (const site of sites) {
+  // `rejected` = the page lookup fails, as on restricted pages.
+  for (const rejected of site.lookups) {
+    const run = setup({ tab: site.tab, rejected });
+    await run.prefill();
+    assert.equal(run.field("title"), site.title, `${site.name}: cleaned title`);
+    assert.equal(run.field("type"), site.type, `${site.name}: type`);
   }
-  const onlineEdited = await setup(directory, { tab: anikotoBzTab, delayed: true });
-  const onlineLoading = onlineEdited.prefill();
-  await Promise.resolve();
-  assert.equal(onlineEdited.element("entry-title").value, "Draw This, Then Die! Episode 2", "AnikotoTV bz cleanup must not wait for page metadata");
-  onlineEdited.element("entry-title").value = "My anime episode title";
-  onlineEdited.element("entry-title").dispatch("input");
-  onlineEdited.release();
-  await onlineLoading;
-  assert.equal(onlineEdited.element("entry-title").value, "My anime episode title");
-  const onlineDraft = await setup(directory, { tab: anikotoBzTab, title: "My saved title | Anikoto", url: anikotoBzTab.url });
-  await onlineDraft.prefill();
-  assert.equal(onlineDraft.element("entry-title").value, "My saved title | Anikoto");
-  const anikotoTab = { id: 14, url: "https://anikototv.to/watch/tokyo-revengers/episode-2", title: "Watch Tokyo Revengers: War of the Three Titan Arc Episode 2 Anime English SUB/DUB - Anikoto" };
-  const anikoto = await setup(directory, { tab: anikotoTab, rejected: true });
-  await anikoto.prefill();
-  assert.equal(anikoto.element("entry-title").value, "Tokyo Revengers: War of the Three Titan Arc Episode 2");
-  assert.equal(anikoto.element("entry-type").value, "anime");
-  const anikotoEdited = await setup(directory, { tab: anikotoTab, delayed: true });
-  const anikotoLoading = anikotoEdited.prefill();
-  await Promise.resolve();
-  assert.equal(anikotoEdited.element("entry-title").value, "Tokyo Revengers: War of the Three Titan Arc Episode 2", "AnikotoTV cleanup must not wait for page metadata");
-  anikotoEdited.element("entry-title").value = "My episode title";
-  anikotoEdited.element("entry-title").dispatch("input");
-  anikotoEdited.release();
-  await anikotoLoading;
-  assert.equal(anikotoEdited.element("entry-title").value, "My episode title");
-  const mangaTab = { id: 13, url: "https://mangafreak.me/Read1_One_Piece_1195", title: "Read One Piece Chapter 1195 - MangaFreak" };
-  const manga = await setup(directory, { tab: mangaTab, rejected: true });
-  await manga.prefill();
-  assert.equal(manga.element("entry-title").value, "One Piece Chapter 1195");
-  assert.equal(manga.element("entry-type").value, "manga");
-  const mangaEdited = await setup(directory, { tab: mangaTab, delayed: true });
-  const mangaLoading = mangaEdited.prefill();
-  await Promise.resolve();
-  assert.equal(mangaEdited.element("entry-title").value, "One Piece Chapter 1195", "MangaFreak cleanup must not wait for page metadata");
-  mangaEdited.element("entry-title").value = "My chapter title";
-  mangaEdited.element("entry-title").dispatch("input");
-  mangaEdited.release();
-  await mangaLoading;
-  assert.equal(mangaEdited.element("entry-title").value, "My chapter title");
-  const imdbTab = { id: 12, url: "https://www.imdb.com/title/tt0117381/", title: "Primal Fear (1996) - IMDb" };
-  for (const rejected of [false, true]) {
-    const movie = await setup(directory, { tab: imdbTab, rejected });
-    await movie.prefill();
-    assert.equal(movie.element("entry-title").value, "Primal Fear (1996)");
-    assert.equal(movie.element("entry-type").value, "film");
-  }
-  const imdbEdited = await setup(directory, { tab: imdbTab, delayed: true });
-  const imdbLoading = imdbEdited.prefill();
-  await Promise.resolve();
-  assert.equal(imdbEdited.element("entry-title").value, "Primal Fear (1996)", "IMDb cleanup must not wait for page metadata");
-  imdbEdited.element("entry-title").value = "My movie title - IMDb";
-  imdbEdited.element("entry-title").dispatch("input");
-  imdbEdited.release();
-  await imdbLoading;
-  assert.equal(imdbEdited.element("entry-title").value, "My movie title - IMDb");
-  const imdbDraft = await setup(directory, { tab: imdbTab, title: "My saved title - IMDb", url: imdbTab.url });
-  await imdbDraft.prefill();
-  assert.equal(imdbDraft.element("entry-title").value, "My saved title - IMDb");
-  for (const domain of ["animepahe.com", "animepahe.pw"]) {
-    const tab = { id: 11, url: `https://${domain}/play/example`, title: "Psyren Ep. 1 :: animepahe" };
-    const anime = await setup(directory, { tab, rejected: true });
-    await anime.prefill();
-    assert.equal(anime.element("entry-title").value, "Psyren Ep. 1");
-    assert.equal(anime.element("entry-type").value, "anime");
-    const edited = await setup(directory, { tab, delayed: true });
-    const loading = edited.prefill();
-    await Promise.resolve();
-    assert.equal(edited.element("entry-title").value, "Psyren Ep. 1");
-    edited.element("entry-title").value = "My anime title";
-    edited.element("entry-title").dispatch("input");
-    edited.release();
-    await loading;
-    assert.equal(edited.element("entry-title").value, "My anime title");
-  }
-  const normal = await setup(directory);
-  await normal.prefill();
-  assert.equal(normal.element("entry-title").value, "Watch Naruto: Shippuden Anime English SUB/DUB - Anikoto");
-  assert.equal(normal.element("entry-type").value, "anime");
-  const manual = await setup(directory, { delayed: true });
+
+  const manual = setup({ tab: site.tab, delayed: true });
   const loading = manual.prefill();
   await Promise.resolve();
-  assert.equal(manual.element("entry-title").value, "Watch Naruto: Shippuden Anime English SUB/DUB - Anikoto", "Title must not wait for page metadata");
-  manual.element("entry-title").value = "My own title";
-  manual.element("entry-title").dispatch("input");
-  manual.element("entry-type").value = "film";
-  manual.element("entry-type").dispatch("change");
+  assert.equal(manual.field("title"), site.title, `${site.name}: cleanup must not wait for page metadata`);
+  manual.edit("title", site.manualTitle);
   manual.release();
   await loading;
-  assert.equal(manual.element("entry-title").value, "My own title");
-  assert.equal(manual.element("entry-type").value, "film");
-  const draft = await setup(directory, { title: "Draft title", url: "https://example.com/old", type: "book" });
-  await draft.prefill({ preserveDraftType: true });
-  assert.equal(draft.element("entry-title").value, "Draft title");
-  assert.equal(draft.element("entry-type").value, "book");
-  const fallback = await setup(directory, { rejected: true });
-  await fallback.prefill();
-  assert.equal(fallback.element("entry-title").value, "Watch Naruto: Shippuden Anime English SUB/DUB - Anikoto");
-  assert.equal(fallback.element("entry-type").value, "anime");
-  const youtubeTab = { id: 8, url: "https://www.youtube.com/watch?v=example", title: "David Foster Wallace unedited interview (2003) - YouTube" };
-  const youtube = await setup(directory, { tab: youtubeTab });
-  await youtube.prefill();
-  assert.equal(youtube.element("entry-type").value, "podcast");
-  assert.equal(youtube.element("entry-title").value, "David Foster Wallace unedited interview (2003)");
-  const youtubeManual = await setup(directory, { tab: youtubeTab, delayed: true });
-  const youtubeLoading = youtubeManual.prefill();
-  await Promise.resolve();
-  assert.equal(youtubeManual.element("entry-title").value, "David Foster Wallace unedited interview (2003)");
-  youtubeManual.element("entry-title").value = "My title - YouTube";
-  youtubeManual.element("entry-title").dispatch("input");
-  youtubeManual.element("entry-type").value = "film";
-  youtubeManual.element("entry-type").dispatch("change");
-  youtubeManual.release();
-  await youtubeLoading;
-  assert.equal(youtubeManual.element("entry-title").value, "My title - YouTube");
-  assert.equal(youtubeManual.element("entry-type").value, "film");
-  const unchangedTitle = "  Show S02E03 — Episode title | Site  ";
-  const raw = await setup(directory, { tab: { id: 9, url: "https://example.com/watch/show", title: unchangedTitle } });
-  await raw.prefill();
-  assert.equal(raw.element("entry-title").value, unchangedTitle);
-  const internal = await setup(directory, { tab: { id: 10, url: "about:blank", title: "Internal tab title" } });
-  await internal.prefill();
-  assert.equal(internal.element("entry-title").value, "Internal tab title");
-  console.log(`${directory}: AnikotoTV/MangaFreak/IMDb cleanup, prefill, manual edits, saved draft, URL fallback, and YouTube default/override passed.`);
+  assert.equal(manual.field("title"), site.manualTitle, `${site.name}: manual title wins`);
+
+  if (site.draftTitle) {
+    const draft = setup({ tab: site.tab, title: site.draftTitle, url: site.tab.url });
+    await draft.prefill();
+    assert.equal(draft.field("title"), site.draftTitle, `${site.name}: saved draft title stays`);
+  }
 }
+
+// Other sites keep the tab title as is.
+const normal = setup();
+await normal.prefill();
+assert.equal(normal.field("title"), DEFAULT_TAB.title);
+assert.equal(normal.field("type"), "anime");
+
+const manual = setup({ delayed: true });
+const loading = manual.prefill();
+await Promise.resolve();
+assert.equal(manual.field("title"), DEFAULT_TAB.title, "Title must not wait for page metadata");
+manual.edit("title", "My own title");
+manual.edit("type", "film", "change");
+manual.release();
+await loading;
+assert.equal(manual.field("title"), "My own title");
+assert.equal(manual.field("type"), "film");
+
+const draft = setup({ title: "Draft title", url: "https://example.com/old", type: "book" });
+await draft.prefill({ preserveDraftType: true });
+assert.equal(draft.field("title"), "Draft title");
+assert.equal(draft.field("type"), "book");
+
+const fallback = setup({ rejected: true });
+await fallback.prefill();
+assert.equal(fallback.field("title"), DEFAULT_TAB.title);
+assert.equal(fallback.field("type"), "anime");
+
+// YouTube defaults to Podcast, and manual changes still win.
+const youtubeTab = { id: 8, url: "https://www.youtube.com/watch?v=example", title: "David Foster Wallace unedited interview (2003) - YouTube" };
+const youtube = setup({ tab: youtubeTab });
+await youtube.prefill();
+assert.equal(youtube.field("type"), "podcast");
+assert.equal(youtube.field("title"), "David Foster Wallace unedited interview (2003)");
+
+const youtubeManual = setup({ tab: youtubeTab, delayed: true });
+const youtubeLoading = youtubeManual.prefill();
+await Promise.resolve();
+assert.equal(youtubeManual.field("title"), "David Foster Wallace unedited interview (2003)");
+youtubeManual.edit("title", "My title - YouTube");
+youtubeManual.edit("type", "film", "change");
+youtubeManual.release();
+await youtubeLoading;
+assert.equal(youtubeManual.field("title"), "My title - YouTube");
+assert.equal(youtubeManual.field("type"), "film");
+
+const unchangedTitle = "  Show S02E03 — Episode title | Site  ";
+const raw = setup({ tab: { id: 9, url: "https://example.com/watch/show", title: unchangedTitle } });
+await raw.prefill();
+assert.equal(raw.field("title"), unchangedTitle);
+
+const internal = setup({ tab: { id: 10, url: "about:blank", title: "Internal tab title" } });
+await internal.prefill();
+assert.equal(internal.field("title"), "Internal tab title");
+
+// The default date is the local calendar day.
+assert.match(normal.field("date"), /^\d{4}-\d{2}-\d{2}$/);
+assert.equal(normal.field("date"), core.localDateString());
+
+console.log(`chrome-nightly: ${sites.length} site title rules, prefill, manual edits, saved draft, URL fallback, and YouTube default/override passed.`);

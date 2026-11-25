@@ -2,10 +2,12 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Media Log</title>
   <link rel="stylesheet" href="popup.css">
 </head>
 <body>
-  <header>
+  <header class="app-header">
     <div class="header-top">
       <div class="brand">
         <img src="icons/logo.png" alt="" class="brand-logo">
@@ -19,10 +21,10 @@
       </button>
     </div>
     <p id="greeting" class="greeting"></p>
-    <nav>
-      <button class="tab active" data-tab="add">Add</button>
-      <button class="tab" data-tab="week">This Week</button>
-      <button class="tab" data-tab="history">History</button>
+    <nav role="tablist" aria-label="Media Log">
+      <button type="button" class="tab active" role="tab" aria-selected="true" data-tab="add">Add</button>
+      <button type="button" class="tab" role="tab" aria-selected="false" data-tab="week">This Week</button>
+      <button type="button" class="tab" role="tab" aria-selected="false" data-tab="history">History</button>
     </nav>
   </header>
 
@@ -39,16 +41,7 @@
       </label>
       <label>
         Type
-        <select id="entry-type">
-          <option value="anime">Anime</option>
-          <option value="article" selected>Article</option>
-          <option value="book">Book</option>
-          <option value="film">Film</option>
-          <option value="game">Game</option>
-          <option value="manga">Manga</option>
-          <option value="podcast">Podcast</option>
-          <option value="tv">TV Show</option>
-        </select>
+        <select id="entry-type" data-type-menu></select>
       </label>
       <label>
         Date
@@ -58,12 +51,18 @@
         Rating (1-10)
         <input type="number" id="entry-rating" min="1" max="10">
       </label>
-      <label>
-        Note
-        <textarea id="entry-note" rows="2"></textarea>
-      </label>
-      <button type="submit" id="btn-add">Add</button>
-      <div id="add-status" class="status"></div>
+      <div class="field">
+        <div class="field-head">
+          <label for="entry-note">Note</label>
+          <button type="button" class="field-action" data-notebook-for="entry-note" title="Open the full notebook">
+            <svg viewBox="0 0 24 24" width="13" height="13" aria-hidden="true"><polyline points="15 3 21 3 21 9"></polyline><polyline points="9 21 3 21 3 15"></polyline><line x1="21" y1="3" x2="14" y2="10"></line><line x1="3" y1="21" x2="10" y2="14"></line></svg>
+            Expand
+          </button>
+        </div>
+        <textarea id="entry-note" rows="3" placeholder="Quick thoughts, or expand for the full notebook"></textarea>
+      </div>
+      <button type="submit" id="btn-add" class="btn">Add</button>
+      <div id="add-status" class="status" role="status"></div>
     </form>
   </section>
 
@@ -72,8 +71,8 @@
     <div id="week-header"></div>
     <div id="week-entries"></div>
 
-    <!-- Inline edit form (hidden by default) -->
-    <form id="edit-form" class="edit-form" style="display:none">
+    <!-- Inline edit form, moved under the entry being edited -->
+    <form id="edit-form" class="edit-form" hidden>
       <label>
         Title
         <input type="text" id="edit-title" required>
@@ -84,16 +83,7 @@
       </label>
       <label>
         Type
-        <select id="edit-type">
-          <option value="anime">Anime</option>
-          <option value="article" selected>Article</option>
-          <option value="book">Book</option>
-          <option value="film">Film</option>
-          <option value="game">Game</option>
-          <option value="manga">Manga</option>
-          <option value="podcast">Podcast</option>
-          <option value="tv">TV Show</option>
-        </select>
+        <select id="edit-type" data-type-menu></select>
       </label>
       <label>
         Date
@@ -103,22 +93,28 @@
         Rating (1-10)
         <input type="number" id="edit-rating" min="1" max="10">
       </label>
-      <label>
-        Note
-        <textarea id="edit-note" rows="2"></textarea>
-      </label>
+      <div class="field">
+        <div class="field-head">
+          <label for="edit-note">Note</label>
+          <button type="button" class="field-action" data-notebook-for="edit-note" title="Open the full notebook">
+            <svg viewBox="0 0 24 24" width="13" height="13" aria-hidden="true"><polyline points="15 3 21 3 21 9"></polyline><polyline points="9 21 3 21 3 15"></polyline><line x1="21" y1="3" x2="14" y2="10"></line><line x1="3" y1="21" x2="10" y2="14"></line></svg>
+            Expand
+          </button>
+        </div>
+        <textarea id="edit-note" rows="3"></textarea>
+      </div>
       <div class="edit-actions">
-        <button type="submit">Save</button>
-        <button type="button" id="edit-cancel">Cancel</button>
+        <button type="submit" class="btn">Save</button>
+        <button type="button" id="edit-cancel" class="btn btn-secondary">Cancel</button>
       </div>
     </form>
 
     <div class="week-actions">
-      <button id="btn-publish-week">Publish to Website</button>
-      <button id="btn-end-week" class="secondary-action">End Week</button>
-      <button id="btn-new-week" class="secondary-action">Start New Week</button>
+      <button type="button" id="btn-publish-week" class="btn">Publish to Website</button>
+      <button type="button" id="btn-end-week" class="btn btn-secondary">End Week</button>
+      <button type="button" id="btn-new-week" class="btn btn-secondary">Start New Week</button>
     </div>
-    <div id="week-publish-status" class="status"></div>
+    <div id="week-publish-status" class="status" role="status"></div>
   </section>
 
   <!-- History -->
@@ -149,15 +145,99 @@
       <h2>Data Transfer</h2>
       <p>Move your current week, full history, draft, name, and theme between browsers.</p>
       <div class="data-transfer-actions">
-        <button type="button" id="btn-export-backup">Export All Data</button>
-        <button type="button" id="btn-import-backup" class="secondary-action">Import Backup</button>
+        <button type="button" id="btn-export-backup" class="btn">Export All Data</button>
+        <button type="button" id="btn-import-backup" class="btn btn-secondary">Import Backup</button>
       </div>
       <input type="file" id="backup-file" accept="application/json,.json" hidden>
       <div id="backup-status" class="status" role="status" aria-live="polite"></div>
     </div>
   </section>
 
+  <!-- Notebook: fills the popup, or the whole tab on the full-page view -->
+  <section id="notebook" class="notebook" aria-label="Notebook" hidden>
+    <div class="nb-bar">
+      <button type="button" class="nb-back" data-nb="close" title="Back to the form (Esc)">
+        <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
+        <span>Back</span>
+      </button>
+      <div class="nb-heading">
+        <span class="nb-kicker">Notebook</span>
+        <span class="nb-title">Untitled entry</span>
+      </div>
+      <span class="nb-save" role="status" aria-live="polite"></span>
+      <div class="segmented" role="group" aria-label="View">
+        <button type="button" data-view="write" aria-pressed="true">Write</button>
+        <button type="button" data-view="split" aria-pressed="false">Split</button>
+        <button type="button" data-view="preview" aria-pressed="false">Preview</button>
+      </div>
+      <button type="button" class="nb-icon" data-nb="popout" title="Open as a full page in a new tab" aria-label="Open as a full page">
+        <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
+      </button>
+      <button type="button" class="btn nb-done" data-nb="close" title="Back to the form (⌘/Ctrl+Enter)">Done</button>
+    </div>
+
+    <div class="nb-toolbar" role="toolbar" aria-label="Formatting">
+      <button type="button" class="nb-tool" data-cmd="heading" title="Heading" aria-label="Heading"><span class="nb-glyph">H</span></button>
+      <button type="button" class="nb-tool" data-cmd="bold" title="Bold (⌘/Ctrl+B)" aria-label="Bold"><span class="nb-glyph"><b>B</b></span></button>
+      <button type="button" class="nb-tool" data-cmd="italic" title="Italic (⌘/Ctrl+I)" aria-label="Italic"><span class="nb-glyph"><i>I</i></span></button>
+      <button type="button" class="nb-tool" data-cmd="strike" title="Strikethrough (⌘/Ctrl+Shift+X)" aria-label="Strikethrough"><span class="nb-glyph"><s>S</s></span></button>
+      <span class="nb-sep" aria-hidden="true"></span>
+      <button type="button" class="nb-tool" data-cmd="bullet" title="Bulleted list" aria-label="Bulleted list">
+        <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><line x1="9" y1="6" x2="20" y2="6"></line><line x1="9" y1="12" x2="20" y2="12"></line><line x1="9" y1="18" x2="20" y2="18"></line><circle cx="4.5" cy="6" r="1"></circle><circle cx="4.5" cy="12" r="1"></circle><circle cx="4.5" cy="18" r="1"></circle></svg>
+      </button>
+      <button type="button" class="nb-tool" data-cmd="number" title="Numbered list" aria-label="Numbered list">
+        <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><line x1="10" y1="6" x2="21" y2="6"></line><line x1="10" y1="12" x2="21" y2="12"></line><line x1="10" y1="18" x2="21" y2="18"></line><path d="M4 6h1v4"></path><path d="M4 10h2"></path><path d="M6 18H4c0-1 2-2 2-3s-1-1.5-2-1"></path></svg>
+      </button>
+      <button type="button" class="nb-tool" data-cmd="task" title="Checklist" aria-label="Checklist">
+        <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="m3 7 2 2 4-4"></path><path d="m3 17 2 2 4-4"></path><line x1="13" y1="6" x2="21" y2="6"></line><line x1="13" y1="12" x2="21" y2="12"></line><line x1="13" y1="18" x2="21" y2="18"></line></svg>
+      </button>
+      <button type="button" class="nb-tool" data-cmd="quote" title="Quote" aria-label="Quote">
+        <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M17 6H3"></path><path d="M21 12H8"></path><path d="M21 18H8"></path><path d="M3 12v6"></path></svg>
+      </button>
+      <button type="button" class="nb-tool" data-cmd="code" title="Code" aria-label="Code">
+        <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><polyline points="16 18 22 12 16 6"></polyline><polyline points="8 6 2 12 8 18"></polyline></svg>
+      </button>
+      <button type="button" class="nb-tool" data-cmd="link" title="Link (⌘/Ctrl+K)" aria-label="Link">
+        <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg>
+      </button>
+      <button type="button" class="nb-tool" data-cmd="divider" title="Divider" aria-label="Divider">
+        <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><line x1="4" y1="12" x2="20" y2="12"></line></svg>
+      </button>
+      <span class="nb-sep" aria-hidden="true"></span>
+      <button type="button" class="nb-tool nb-tool-wide" data-cmd="video-time" title="Insert the current time of the video playing on the page">
+        <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><circle cx="12" cy="12" r="10"></circle><polygon points="10 8 16 12 10 16 10 8"></polygon></svg>
+        <span>Video time</span>
+      </button>
+      <button type="button" class="nb-tool nb-tool-wide" data-cmd="now" title="Insert today's date and time">
+        <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+        <span>Now</span>
+      </button>
+      <span class="nb-spacer"></span>
+      <button type="button" class="nb-tool nb-tool-wide" data-cmd="font" title="Change the writing font">
+        <span class="nb-glyph">Aa</span>
+        <span class="nb-font-label">Serif</span>
+      </button>
+    </div>
+
+    <div class="nb-body" data-view="write">
+      <textarea class="nb-editor" aria-label="Note" spellcheck="true" placeholder="Start writing. Markdown works: # heading, **bold**, - list, - [ ] checklist, > quote"></textarea>
+      <article class="nb-preview md" aria-label="Preview"></article>
+    </div>
+
+    <div class="nb-foot">
+      <span class="nb-stats">Empty note</span>
+      <span class="nb-hint">Markdown · ⌘/Ctrl+B bold · ⌘/Ctrl+I italic · Tab indents lists</span>
+    </div>
+  </section>
+
+  <div id="toast" class="toast" role="status" aria-live="polite" hidden>
+    <span class="toast-message"></span>
+    <button type="button" class="toast-action"></button>
+  </div>
+
   <script src="media-metadata.js"></script>
+  <script src="core.js"></script>
+  <script src="notebook.js"></script>
   <script src="popup.js"></script>
 </body>
 </html>

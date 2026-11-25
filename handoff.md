@@ -8,7 +8,19 @@ Keep Nightly's manifest key and folder path. Use Reload on the existing extensio
 
 Browser storage keeps `currentWeek`, `history`, `addDraft`, `userName`, and `theme`. This cleanup does not change those keys or their format.
 
-The Add and Edit menus offer Anime, Article, Book, Film, Game, Manga, Podcast, and TV Show. YouTube links default to Podcast.
+The Add and Edit menus offer Anime, Article, Book, Film, Game, Manga, Podcast, and TV Show. YouTube links default to Podcast. The menus are built from `SELECTABLE_TYPES` in `chrome-nightly/core.js`.
+
+## Notebook
+
+Expand beside Note opens the notebook inside the popup. Its pop-out button opens `popup.html?notebook=1` in a tab, which edits only the Add draft's note. Notes stay plain text with Markdown, so storage, backups, and the website bridge keep the same format. Notes can hold up to 100,000 characters.
+
+Video time reads the playing video's position from the tab Media Log was opened on. It reads nothing else from the page.
+
+## Code Layout
+
+- `popup.js`: popup UI, draft saving, rendering, and the transfer and notebook pages.
+- `core.js`: pure data rules (weeks, entries, search, backup validation). The backup check loads this file directly.
+- `notebook.js`: the editor controller, editing helpers, and the Markdown parser and renderer.
 
 ## Edit and Check
 
@@ -19,7 +31,7 @@ bun run sync:media-metadata
 bun run verify
 ```
 
-The backup check reuses Nightly's real validation and storage comparison code with test data. It checks entry counts, missing history, and unsafe URL rejection.
+The backup check reuses Nightly's real validation and storage comparison code from `core.js` with test data. It checks entry counts, missing history, long notes, and unsafe URL rejection. The notebook check covers list editing, formatting, and safe Markdown links.
 
 ## Backups and Moving Browsers
 

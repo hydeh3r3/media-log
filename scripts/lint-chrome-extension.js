@@ -24,7 +24,7 @@ for (const field of ["name", "version", "description", "action", "icons"]) {
 
 const permissions = manifest.permissions || [];
 for (const permission of permissions) {
-  if (!["storage", "tabs", "activeTab", "scripting", "clipboardWrite"].includes(permission)) {
+  if (!["storage", "tabs", "activeTab", "scripting"].includes(permission)) {
     errors.push(`Unexpected required permission: ${permission}`);
   }
 }
@@ -45,9 +45,17 @@ for (const iconPath of Object.values(manifest.action?.default_icon || {})) {
   requireFile(iconPath);
 }
 
-const sourceFiles = ["manifest.json", "popup.html", "popup.css", "popup.js", "media-metadata.js"];
+const sourceFiles = ["manifest.json", "popup.html", "popup.css", "popup.js", "core.js", "notebook.js", "media-metadata.js"];
 for (const file of sourceFiles) {
   requireFile(file);
+}
+
+// Every local script the popup loads must exist, in dependency order, with popup.js last.
+const html = await Bun.file(join(EXTENSION_DIR, "popup.html")).text();
+const scripts = [...html.matchAll(/<script src="([^"]+)"><\/script>/g)].map((match) => match[1]);
+for (const script of scripts) requireFile(script);
+if (scripts.join(",") !== "media-metadata.js,core.js,notebook.js,popup.js") {
+  errors.push(`popup.html must load media-metadata.js, core.js, notebook.js, then popup.js (found ${scripts.join(", ")}).`);
 }
 
 if (errors.length > 0) {

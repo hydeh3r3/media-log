@@ -19,7 +19,8 @@
   };
   const youtubeDomains = ["youtube.com", "youtu.be", "youtube-nocookie.com"];
   const anikotoTvDomains = ["anikototv.to", "anikototv.bz"];
-  const animeDomains = ["anikoto.cz", "anikoto.com", ...anikotoTvDomains, "crunchyroll.com", "hidive.com", "animepahe.com", "animepahe.pw", "funimation.com"];
+  const animePaheDomains = ["animepahe.com", "animepahe.pw"];
+  const animeDomains = ["anikoto.cz", "anikoto.com", ...anikotoTvDomains, "crunchyroll.com", "hidive.com", ...animePaheDomains, "funimation.com"];
   const mangaDomains = ["mangadex.org", "mangaplus.shueisha.co.jp", "mangafire.to", "mangafreak.me", "manga4life.com", "manganato.com", "comick.io", "comick.dev", "webtoons.com"];
   // Absolute HTTP(S) URLs only.
   function parseURL(raw) {
@@ -106,6 +107,34 @@
     return { type: null, reason: "Type uncertain — check the selection" };
   }
 
+  // Site-specific title cleanup. Each rule removes only its own site's labels; the first matching
+  // host wins, and every other title is kept exactly as the tab shows it. A rule with a type
+  // also decides the media type without reading page metadata.
+  const titleRules = [
+    {
+      matches: (host) => onAny(host, animePaheDomains),
+      clean: (title) => title.replace(/\s*::\s*animepahe\s*$/i, ""),
+      type: "anime",
+      reason: "AnimePahe",
+    },
+    { matches: (host) => onDomain(host, "imdb.com"), clean: (title) => title.replace(/\s+-\s+IMDb\s*$/i, "") },
+    {
+      // mangafreak.<TLD> and its subdomains, including alternate mirror domains.
+      matches: (host) => /(?:^|\.)mangafreak\.[a-z]{2,}$/.test(host),
+      clean: (title) => title.replace(/^\s*Read\s+/i, "").replace(/\s+-\s+MangaFreak\s*$/i, ""),
+    },
+    {
+      matches: (host) => onAny(host, anikotoTvDomains),
+      clean: (title) => title.replace(/^\s*Watch\s+/i, "")
+        .replace(/\s+Anime\s+(?:English\s+SUB\/DUB\s+-|Online\s+\|)\s+Anikoto\s*$/i, ""),
+    },
+    { matches: (host) => onAny(host, youtubeDomains), clean: (title) => title.replace(/\s+-\s+YouTube\s*$/i, "") },
+    {
+      matches: (host) => onDomain(host, "mangaplus.shueisha.co.jp"),
+      clean: (title) => title.replace(/\s+[|-]\s+MANGA\s+Plus\s*$/i, ""),
+    },
+  ];
+
   function detect(input = {}) {
     const signals = object(input.signals) ? input.signals : {};
     const page = parseURL(input.url || signals.url);
@@ -113,21 +142,9 @@
     const rawTitle = typeof input.title === "string" ? input.title
       : typeof signals.title === "string" ? signals.title : "";
     if (!page) return { title: rawTitle, type: null, reason: "Use an HTTP or HTTPS content page" };
-    if (onAny(page.host, ["animepahe.com", "animepahe.pw"])) {
-      return { title: rawTitle.replace(/\s*::\s*animepahe\s*$/i, ""), type: "anime", reason: "AnimePahe" };
-    }
-    let title = rawTitle;
-    if (onDomain(page.host, "imdb.com")) title = rawTitle.replace(/\s+-\s+IMDb\s*$/i, "");
-    // Match mangafreak.<TLD> and its subdomains, including alternate mirror domains.
-    else if (/(?:^|\.)mangafreak\.[a-z]{2,}$/.test(page.host)) {
-      title = rawTitle.replace(/^\s*Read\s+/i, "").replace(/\s+-\s+MangaFreak\s*$/i, "");
-    }
-    else if (onAny(page.host, anikotoTvDomains)) {
-      title = rawTitle.replace(/^\s*Watch\s+/i, "")
-        .replace(/\s+Anime\s+(?:English\s+SUB\/DUB\s+-|Online\s+\|)\s+Anikoto\s*$/i, "");
-    }
-    else if (onAny(page.host, youtubeDomains)) title = rawTitle.replace(/\s+-\s+YouTube\s*$/i, "");
-    else if (onDomain(page.host, "mangaplus.shueisha.co.jp")) title = rawTitle.replace(/\s+[|-]\s+MANGA\s+Plus\s*$/i, "");
+    const rule = titleRules.find((item) => item.matches(page.host));
+    const title = rule ? rule.clean(rawTitle) : rawTitle;
+    if (rule?.type) return { title, type: rule.type, reason: rule.reason };
     const entity = selectEntity(signals, input.url || signals.url);
     return { title, ...typeForPage(page, signals, entity, rawTitle) };
   }

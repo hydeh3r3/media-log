@@ -46,6 +46,8 @@ Verification checks Nightly's JavaScript, manifest, title and type rules, form b
 
 Open a content page and then Media Log. Check the title, URL, type, and date. Change the title or type while a page lookup is pending; your edit should stay.
 
+Choose Expand beside Note. The popup widens into the notebook. Type a list item and press Enter; the next item starts on its own. Switch between Write, Split, and Preview, then choose Done. The note should be back in the form.
+
 Use a test browser profile if you want to add or remove sample entries.
 
 ## Publish a Week

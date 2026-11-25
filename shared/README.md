@@ -11,6 +11,8 @@ bun run sync:media-metadata
 bun run verify
 ```
 
-The copy command writes only `chrome-nightly/media-metadata.js`. Nightly keeps its own entry storage, week logic, backup validation, and popup in `chrome-nightly/popup.js`.
+The copy command writes only `chrome-nightly/media-metadata.js`. Nightly keeps its week logic and backup validation in `chrome-nightly/core.js`, and its popup in `chrome-nightly/popup.js`.
+
+Site title cleanup lives in the `titleRules` table in `media-metadata.js`. Add a row there for a new site, then add examples to the fixtures.
 
 Private logs and backup files do not belong here.

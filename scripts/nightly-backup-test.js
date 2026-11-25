@@ -4,69 +4,10 @@ import { join } from "node:path";
 
 const ROOT = new URL("..", import.meta.url).pathname;
 
-function createElementStub() {
-  return {
-    addEventListener() {},
-    after() {},
-    appendChild() {},
-    classList: {
-      add() {},
-      remove() {},
-      toggle() {},
-    },
-    click() {},
-    dataset: {},
-    files: [],
-    style: {},
-    value: "",
-  };
-}
-
-function createDocumentStub() {
-  const elements = new Map();
-  return {
-    createElement: () => createElementStub(),
-    documentElement: { dataset: {} },
-    getElementById(id) {
-      if (!elements.has(id)) elements.set(id, createElementStub());
-      return elements.get(id);
-    },
-    querySelector: () => createElementStub(),
-    querySelectorAll: () => [],
-  };
-}
-
-async function loadBackupValidator(sourcePath, apiName) {
+// core.js has no DOM or chrome dependencies, so the real validator loads directly.
+async function loadBackupValidator(sourcePath) {
   const source = await readFile(sourcePath, "utf8");
-  const sourceWithoutInit = source.replace(/\ninit\(\);\s*$/, "\n");
-  const factory = new Function(`${sourceWithoutInit}\nreturn { countBackupEntries, validateBackup, verifyPortableStorage };`);
-  const previousApi = globalThis[apiName];
-  const previousDocument = globalThis.document;
-  const previousLocalStorage = globalThis.localStorage;
-
-  globalThis.document = createDocumentStub();
-  globalThis.localStorage = {
-    getItem: () => null,
-    setItem() {},
-  };
-  globalThis[apiName] = {
-    storage: {
-      local: {
-        get: async () => ({}),
-        remove: async () => undefined,
-        set: async () => undefined,
-      },
-    },
-    tabs: { query: async () => [] },
-  };
-
-  try {
-    return factory();
-  } finally {
-    globalThis[apiName] = previousApi;
-    globalThis.document = previousDocument;
-    globalThis.localStorage = previousLocalStorage;
-  }
+  return new Function("globalThis", `${source}\nreturn globalThis.MediaLogCore;`)({});
 }
 
 function syntheticBackup() {
@@ -113,7 +54,7 @@ function syntheticBackup() {
   };
 }
 
-const chromeValidator = await loadBackupValidator(join(ROOT, "chrome-nightly/popup.js"), "chrome");
+const chromeValidator = await loadBackupValidator(join(ROOT, "chrome-nightly/core.js"));
 const backup = process.env.MEDIA_LOG_BACKUP_PATH
   ? JSON.parse(await readFile(process.env.MEDIA_LOG_BACKUP_PATH, "utf8"))
   : syntheticBackup();
@@ -136,6 +77,16 @@ for (const [label, validator] of [["Nightly", chromeValidator]]) {
   const unsafeBackup = structuredClone(syntheticBackup());
   unsafeBackup.data.currentWeek.entries[0].url = "javascript:alert(1)";
   assert.throws(() => validator.validateBackup(unsafeBackup), /HTTP or HTTPS/, `${label} should reject unsafe URL schemes.`);
+
+  // Long notebook notes survive a backup round trip; absurdly long ones are still refused.
+  const longNote = structuredClone(syntheticBackup());
+  longNote.data.history[0].entries[0].note = "word ".repeat(18_000);
+  longNote.data.addDraft = { url: "", title: "", type: "article", date: "", rating: "", note: "draft ".repeat(15_000) };
+  const longData = validator.validateBackup(longNote);
+  assert.equal(longData.history[0].entries[0].note.length, 90_000, `${label} should keep a 90,000 character note.`);
+  const tooLong = structuredClone(syntheticBackup());
+  tooLong.data.history[0].entries[0].note = "x".repeat(100_001);
+  assert.throws(() => validator.validateBackup(tooLong), /too long/, `${label} should reject notes over the limit.`);
 }
 
 console.log(`Nightly backup checks passed: ${expectedEntryCount} entries preserved; truncated data and unsafe URLs rejected.`);

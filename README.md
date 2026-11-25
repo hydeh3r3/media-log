@@ -6,7 +6,9 @@ Media Log Nightly is a personal media journal for Chromium browsers, including C
 
 - Capture the active tab's title and URL.
 - Suggest a media type and keep your manual edits.
-- Add, edit, and delete entries in the current week.
+- Write long notes in the notebook: open it with Expand beside Note, or as a full page in a tab.
+- Format notes with Markdown, checklists, the playing video's time, and a date stamp.
+- Add, edit, and delete entries in the current week, with Undo after a delete.
 - Keep weekly history and saved drafts.
 - Export and import a full backup.
 - Publish a chosen week through the local website bridge.
@@ -15,6 +17,10 @@ Media Log Nightly is a personal media journal for Chromium browsers, including C
 ## Project Layout
 
 - `chrome-nightly/`: the only extension app.
+  - `popup.js`: the popup, plus the full-page transfer and notebook views.
+  - `core.js`: weeks, entries, search, and backup rules. No browser APIs.
+  - `notebook.js`: the notebook editor and Markdown renderer.
+  - `media-metadata.js`: a copy of the shared title and type rules.
 - `shared/`: metadata source and examples.
 - `scripts/`: Nightly checks and metadata copying.
 - `docs/`: install, privacy, and behavior notes.
@@ -41,7 +47,7 @@ bun run sync:media-metadata
 bun run verify
 ```
 
-The checks cover syntax, the manifest, metadata, form behavior, full backups, and local docs.
+The checks cover syntax, the manifest, metadata, form behavior, the notebook's editing and Markdown rules, full backups, and local docs.
 
 ## Your Data
 

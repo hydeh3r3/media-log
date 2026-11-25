@@ -6,10 +6,11 @@
   "scripts": {
     "sync:media-metadata": "bun run scripts/sync-media-metadata.js",
     "check:media-metadata": "bun run scripts/sync-media-metadata.js --check && bun run scripts/media-detection-test.js && bun run scripts/media-prefill-test.js",
-    "check:nightly": "node --check chrome-nightly/popup.js && node --check chrome-nightly/media-metadata.js",
+    "check:nightly": "node --check chrome-nightly/popup.js && node --check chrome-nightly/core.js && node --check chrome-nightly/notebook.js && node --check chrome-nightly/media-metadata.js",
+    "check:notebook": "node --check scripts/notebook-test.js && bun run scripts/notebook-test.js",
     "check:backup": "node --check scripts/nightly-backup-test.js && bun run scripts/nightly-backup-test.js",
     "check:handoff": "node --check scripts/check-docs-handoff.js && bun run scripts/check-docs-handoff.js",
     "lint:nightly": "bun run scripts/lint-chrome-extension.js",
-    "verify": "bun run check:nightly && bun run lint:nightly && bun run check:media-metadata && bun run check:backup && bun run check:handoff"
+    "verify": "bun run check:nightly && bun run lint:nightly && bun run check:media-metadata && bun run check:notebook && bun run check:backup && bun run check:handoff"
   }
 }

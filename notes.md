@@ -10,6 +10,8 @@ Nightly is the only supported app in this repo.
 - Let manual title and type edits win over a pending lookup.
 - Keep Music out of the Add and Edit menus.
 - Use full backup import and export to move data between browser profiles.
+- Keep notes as plain text. The notebook's Markdown renders in the popup only; storage and the website bridge get the text unchanged.
+- Keep `core.js` free of DOM and `chrome.*` calls so the checks can load it directly.
 
 Project cleanup does not copy logs into another browser. Verify each import from the destination's own export before calling a transfer complete.
 

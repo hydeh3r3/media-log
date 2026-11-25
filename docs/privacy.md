@@ -4,6 +4,8 @@ Media Log Nightly stores titles, URLs, dates, ratings, notes, weekly history, dr
 
 It reads the active tab's title and URL to fill the form. It may read headings and structured media details on that page to suggest a media type. These rules run on your device. Page content is not sent to an AI service.
 
+When you choose Video time in the notebook, Media Log reads the current position of the video playing on that tab. It reads nothing else and sends it nowhere; the time is only added to your note.
+
 Media Log does not read your full browser history. It does not use analytics or sell user data. It does not use user data for ads.
 
 ## Exports and Publishing
