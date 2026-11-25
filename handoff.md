@@ -10,6 +10,10 @@ Browser storage keeps `currentWeek`, `history`, `addDraft`, `userName`, and `the
 
 The Add and Edit menus offer Anime, Article, Book, Film, Game, Manga, Podcast, and TV Show. YouTube links default to Podcast. The menus are built from `SELECTABLE_TYPES` in `chrome-nightly/core.js`.
 
+## Weeks
+
+The current week moves to History when a new ISO week starts. There is no manual Start New Week button; it used to split one week into two History records with the same number. If a week is already in History when it rolls over, its remaining entries merge into that record.
+
 ## Notebook
 
 Expand beside Note opens the notebook inside the popup. Its pop-out button opens `popup.html?notebook=1` in a tab, which edits only the Add draft's note. Notes stay plain text with Markdown, so storage, backups, and the website bridge keep the same format. Notes can hold up to 100,000 characters.

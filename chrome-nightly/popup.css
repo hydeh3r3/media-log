@@ -406,15 +406,12 @@ textarea {
   margin-bottom: 10px;
 }
 
+/* Weeks roll over on their own each Monday, so these only publish or export the current week. */
 .week-actions {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 2fr 1fr;
   gap: 8px;
   margin-top: 12px;
-}
-
-.week-actions #btn-publish-week {
-  grid-column: 1 / -1;
 }
 
 .day-group {

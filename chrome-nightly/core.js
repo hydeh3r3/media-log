@@ -166,6 +166,8 @@
   }
 
   // Move a stale current week into history when a new ISO week starts. Empty weeks are dropped.
+  // History keeps one record per ISO week: if that week is already archived (the retired
+  // Start New Week button could split a week), the entries join it instead of duplicating it.
   function rollWeek(state, now = new Date()) {
     const { week, year } = getISOWeek(now);
     if (state.currentWeek && state.currentWeek.weekNumber === week && state.currentWeek.year === year) {
@@ -174,19 +176,17 @@
     state.history = state.history || [];
     let archivedWeek = null;
     if (state.currentWeek?.entries?.length) {
-      archivedWeek = state.currentWeek;
-      state.history.unshift(archivedWeek);
+      archivedWeek = state.history.find((item) => isSameWeek(item, state.currentWeek)) || null;
+      if (archivedWeek) {
+        archivedWeek.entries.push(...state.currentWeek.entries);
+        sortEntries(archivedWeek.entries);
+      } else {
+        archivedWeek = state.currentWeek;
+        state.history.unshift(archivedWeek);
+      }
     }
     state.currentWeek = createWeek(year, week);
     return { changed: true, archivedWeek };
-  }
-
-  // The Start New Week button: archive the current entries and begin an empty week.
-  function startNewWeek(state, now = new Date()) {
-    state.history = state.history || [];
-    if (state.currentWeek?.entries?.length) state.history.unshift(state.currentWeek);
-    const { week, year } = getISOWeek(now);
-    state.currentWeek = createWeek(year, week);
   }
 
   const emptyDraft = (overrides = {}) => ({ url: "", title: "", type: DEFAULT_ENTRY_TYPE, date: "", rating: "", note: "", ...overrides });
@@ -430,7 +430,7 @@
     normalizeSelectableType, typeLabel, pluralize,
     getISOWeek, getWeekBounds, formatDate, localDateString, formatDateRange, formatDayHeader, getWeekInfoForDate,
     createWeek, isSameWeek, weekKey, weekLabel,
-    sortEntries, ensureHistoryWeek, placeEntryInWeek, normalizeCreatedAt, rollWeek, startNewWeek,
+    sortEntries, ensureHistoryWeek, placeEntryInWeek, normalizeCreatedAt, rollWeek,
     emptyDraft, buildEntry, entryMeta, groupByDay, weekExport,
     parseSearch, entryMatchesSearch,
     assertBackup, validateBackup, createBackup, countBackupEntries, stableSerialize, verifyPortableStorage, describeBackupCoverage,

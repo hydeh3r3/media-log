@@ -9,7 +9,7 @@ Media Log Nightly is a personal media journal for Chromium browsers, including C
 - Write long notes in the notebook: open it with Expand beside Note, or as a full page in a tab.
 - Format notes with Markdown, checklists, the playing video's time, and a date stamp.
 - Add, edit, and delete entries in the current week, with Undo after a delete.
-- Keep weekly history and saved drafts.
+- Keep weekly history and saved drafts. Each Monday the finished week moves to History on its own.
 - Export and import a full backup.
 - Publish a chosen week through the local website bridge.
 - Set your name and theme.

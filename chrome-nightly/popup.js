@@ -536,13 +536,6 @@ async function exportCurrentWeek() {
   downloadJson(filename, data);
 }
 
-async function startNewWeek() {
-  await ensureCurrentWeek();
-  Core.startNewWeek(state);
-  await persistState();
-  renderWeek();
-}
-
 // --- History ---
 
 // Publish messages are keyed by week so they survive re-renders from searching or switching tabs.
@@ -872,7 +865,6 @@ function bindPopup() {
   $("edit-cancel").addEventListener("click", hideEditForm);
   $("btn-publish-week").addEventListener("click", publishCurrentWeek);
   $("btn-end-week").addEventListener("click", exportCurrentWeek);
-  $("btn-new-week").addEventListener("click", startNewWeek);
 
   const historyList = $("history-list");
   $("history-search").addEventListener("input", () => renderHistorySoon());
