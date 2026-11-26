@@ -51,7 +51,7 @@ The checks cover syntax, the manifest, metadata, form behavior, the notebook's e
 
 ## Your Data
 
-Entries live in the browser profile's extension storage. Project cleanup does not change that storage. Full backup files include the current week, history, draft when present, name, and theme.
+Entries live in the browser profile's extension storage. Project cleanup does not change that storage. Full backup files include the current week, history, drafts and set-aside entries when present, name, and theme.
 
 Use Export All Data before moving to another browser. Use Import Backup in the new browser. Keep personal backup files outside this repo.
 

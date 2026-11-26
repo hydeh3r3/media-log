@@ -18,7 +18,7 @@ const PAGE = pageParams.get("transfer") === "1" ? "transfer" : pageParams.get("n
 const TRANSFER_PAGE_PATH = "popup.html?transfer=1";
 const NOTEBOOK_PAGE_PATH = "popup.html?notebook=1";
 const BRIDGE_URLS = ["http://127.0.0.1:43187", "http://localhost:43187"];
-const PORTABLE_KEYS = ["currentWeek", "history", "addDraft", "userName", "theme"];
+const PORTABLE_KEYS = ["currentWeek", "history", "addDraft", "parkedDrafts", "userName", "theme"];
 const DRAFT_FIELDS = ["url", "title", "type", "date", "rating", "note"];
 const SAVE_DELAY_MS = 300;
 const SEARCH_DELAY_MS = 120;
@@ -229,6 +229,77 @@ function restoreDraft(addDraft) {
   return Boolean(addDraft.url || addDraft.title);
 }
 
+// --- Unfinished entries from other pages ---
+// Opening Media Log on a different page fills the form from that page. Unfinished entries from
+// earlier pages wait in parkedDrafts (newest first) until you restore or discard them, and an
+// entry set aside for the page you are on comes back on its own.
+
+let parkedDrafts = [];
+let formHasDraft = false; // The form holds a draft (restored or typed), not just the open page.
+
+const withDraftFields = (draft) => ({ ...Core.emptyDraft(), ...draft });
+const draftLabel = (draft) => draft.title.trim() || draft.url || "Untitled entry";
+
+// Save the form draft and the set-aside list together. Everything is written before anything is
+// removed, so a popup closing mid-save can at worst leave a duplicate, never lose a draft.
+async function saveDrafts(form) {
+  const items = { ...(form ? { addDraft: form } : {}), ...(parkedDrafts.length ? { parkedDrafts } : {}) };
+  const gone = [...(form ? [] : ["addDraft"]), ...(parkedDrafts.length ? [] : ["parkedDrafts"])];
+  if (Object.keys(items).length) await storage.set(items);
+  if (gone.length) await storage.remove(gone);
+}
+
+function renderParkedDrafts() {
+  const notice = $("parked-draft");
+  const [latest] = parkedDrafts;
+  notice.hidden = !latest;
+  if (!latest) return;
+  notice.querySelector(".draft-notice-title").textContent = draftLabel(latest);
+  notice.querySelector(".draft-notice-more").textContent = parkedDrafts.length > 1 ? ` (+${parkedDrafts.length - 1} more)` : "";
+}
+
+// Swap the newest set-aside entry into the form. A draft already in the form is set aside in its place.
+async function restoreParkedDraft() {
+  const swap = Core.restoreParked(formHasDraft ? readDraft() : null, parkedDrafts);
+  if (!swap) return;
+  saveDraftSoon.cancel();
+  metadataRequest += 1; // A page lookup still running must not change the restored fields.
+  writeDraft(swap.form);
+  formHasDraft = true;
+  parkedDrafts = swap.parked;
+  renderParkedDrafts();
+  await queueDraftWrite(() => saveDrafts(swap.form));
+}
+
+async function discardParkedDraft() {
+  const [latest, ...rest] = parkedDrafts;
+  if (!latest) return;
+  parkedDrafts = rest;
+  renderParkedDrafts();
+  const saveList = () => (parkedDrafts.length ? storage.set({ parkedDrafts }) : storage.remove("parkedDrafts"));
+  await queueDraftWrite(saveList);
+  showToast(`Discarded "${draftLabel(latest)}"`, {
+    actionLabel: "Undo",
+    onAction: () => {
+      parkedDrafts = [latest, ...parkedDrafts];
+      renderParkedDrafts();
+      return queueDraftWrite(saveList);
+    },
+  });
+}
+
+// Fill the form from the right draft for the open page. Returns true when a draft was restored.
+async function openDraftForPage(stored, tabQuery) {
+  const [tab] = await tabQuery.catch(() => []);
+  const addDraft = stored.addDraft ? withDraftFields(stored.addDraft) : null;
+  const plan = Core.planDrafts(addDraft, (stored.parkedDrafts || []).map(withDraftFields), tab?.url);
+  parkedDrafts = plan.parked;
+  if (plan.changed) await queueDraftWrite(() => saveDrafts(plan.form));
+  renderParkedDrafts();
+  formHasDraft = Boolean(plan.form);
+  return restoreDraft(plan.form);
+}
+
 function saveDraftNow() {
   const draft = readDraft();
   return queueDraftWrite(() => storage.set({ addDraft: draft })).then(
@@ -243,6 +314,7 @@ function bindDraftFields() {
   for (const name of DRAFT_FIELDS) {
     const recordEdit = () => {
       if (name in fieldEdits) fieldEdits[name] += 1;
+      formHasDraft = true;
       reportDraftState("saving");
       saveDraftSoon();
     };
@@ -278,7 +350,8 @@ async function prefillFromTab({ preserveDraftType = false, tabQuery = null } = {
     const [tab] = await (tabQuery || chrome.tabs.query({ active: true, currentWindow: true }));
     if (typeof tab?.id === "number") activeTabId = tab.id;
     if (!tab || isStale() || (initial.url && initial.url !== tab.url)) return;
-    if (!initial.url) urlInput.value = tab.url || "";
+    // Only web links: an entry with any other URL would make the full backup fail to import.
+    if (!initial.url && Core.isWebUrl(tab.url)) urlInput.value = tab.url;
     // Fill the title immediately, including site-specific cleanup, before reading the page.
     if (!initial.title && fieldEdits.title === initial.edits.title) {
       titleInput.value = MediaLogMetadata.detect({ url: tab.url, title: tab.title || "" }).title;
@@ -316,6 +389,7 @@ async function addEntry(event) {
     await persistState();
     await queueDraftWrite(() => storage.remove("addDraft"));
     writeDraft(Core.emptyDraft({ date: localDateString() }));
+    formHasDraft = false;
     flashStatus($("add-status"), `Added "${entry.title}" to Week ${targetWeek.weekNumber}`);
     await prefillFromTab();
   } catch (error) {
@@ -708,7 +782,8 @@ async function importBackupFile() {
 
     // Import replaces everything, including a draft the backup does not have.
     await storage.set(data);
-    if (!data.addDraft) await storage.remove("addDraft");
+    const missing = ["addDraft", "parkedDrafts"].filter((key) => !(key in data));
+    if (missing.length) await storage.remove(missing);
     Core.verifyPortableStorage(data, await storage.get(PORTABLE_KEYS));
 
     applyTheme(data.theme);
@@ -776,26 +851,59 @@ function openNotebookFor(textareaId) {
 }
 
 async function popOutNotebook() {
-  await flushPendingSaves();
+  // Save the form now, even untouched, so the full page is tied to this entry's URL.
+  saveDraftSoon.cancel();
+  saveNameSoon.flush();
+  await saveDraftNow();
   const source = activeTabId === null ? "" : `&tab=${activeTabId}`;
   // Opening the tab closes the popup; the draft is already saved.
   await chrome.tabs.create({ url: chrome.runtime.getURL(`${NOTEBOOK_PAGE_PATH}${source}`) });
 }
 
-// The full-page notebook edits only the Add draft's note and keeps the other draft fields.
+// The full-page notebook edits one entry's note. It finds that entry by URL, whether it is the
+// Add draft or was set aside in parkedDrafts, and stops editing once the entry is added or discarded.
+// Opened without a draft URL, it edits whatever the Add draft is, as before.
 function initNotebookPage(addDraft) {
   document.body.classList.add("notebook-page");
   const sourceTabId = Number.parseInt(pageParams.get("tab") || "", 10);
+  const boundUrl = addDraft?.url || "";
+  // Where this page's entry is: place is "form", "aside", "gone", or "none" (no draft yet).
+  let found = { place: addDraft ? "form" : "none", draft: addDraft };
+  let endedMessage = "Added to your log";
+
   const titleOf = (draft) => draft?.title?.trim() || "";
   const showTitle = (draft) => {
     notebook.setTitle(titleOf(draft));
     document.title = titleOf(draft) ? `${titleOf(draft)} · Media Log notes` : "Media Log notes";
   };
 
-  pageNoteSave = debounce((note) => queueDraftWrite(async () => {
-    const { addDraft: latest } = await storage.get("addDraft");
-    await storage.set({ addDraft: { ...Core.emptyDraft(), ...latest, note } });
-  }).then(() => notebook.setSaveState("saved"), () => notebook.setSaveState("error")), SAVE_DELAY_MS);
+  async function locate() {
+    const { addDraft: draft, parkedDrafts: parked = [] } = await storage.get(["addDraft", "parkedDrafts"]);
+    if (!boundUrl) return { place: draft ? "form" : "none", draft };
+    if (draft?.url === boundUrl) return { place: "form", draft };
+    const index = parked.findIndex((item) => item.url === boundUrl);
+    return index >= 0 ? { place: "aside", draft: parked[index], index, parked } : { place: "gone" };
+  }
+
+  // The write starts immediately from what this page last read (no read first), so it still
+  // reaches storage when the tab is closing.
+  function writeNote(note) {
+    if (found.place === "gone") return Promise.resolve(false);
+    if (found.place === "aside") {
+      const parked = found.parked.slice();
+      parked[found.index] = { ...withDraftFields(found.draft), note };
+      found = { ...found, parked, draft: parked[found.index] };
+      return storage.set({ parkedDrafts: parked }).then(() => true);
+    }
+    const draft = { ...Core.emptyDraft(), ...found.draft, note };
+    found = { place: "form", draft };
+    return storage.set({ addDraft: draft }).then(() => true);
+  }
+
+  pageNoteSave = debounce((note) => writeNote(note).then(
+    (saved) => notebook.setSaveState("saved", !saved ? endedMessage : found.place === "aside" ? "Saved (set aside in Media Log)" : undefined),
+    () => notebook.setSaveState("error"),
+  ), SAVE_DELAY_MS);
 
   notebook.open({
     value: addDraft?.note || "",
@@ -810,20 +918,34 @@ function initNotebookPage(addDraft) {
   });
   showTitle(addDraft);
 
+  // Storage events arrive one per key, so apply them one at a time against a fresh read.
+  let updates = locate().then((latest) => { found = latest; });
   chrome.storage.onChanged.addListener((changes, area) => {
-    if (area !== "local" || !("addDraft" in changes)) return;
-    const next = changes.addDraft.newValue;
-    if (!next) {
-      // The popup added the entry with this note. Start fresh instead of re-saving it.
-      pageNoteSave.cancel();
-      notebook.setValue("");
-      showTitle(null);
-      notebook.setSaveState("saved", "Added to your log");
-      return;
-    }
-    showTitle(next);
-    // Take edits made in the popup, but never overwrite this page while you type here.
-    if (!document.hasFocus() && typeof next.note === "string") notebook.setValue(next.note);
+    if (area !== "local" || !("addDraft" in changes || "parkedDrafts" in changes)) return;
+    updates = updates.then(async () => {
+      const previous = found.place;
+      found = await locate();
+      if (found.place === "gone" || (found.place === "none" && previous === "form")) {
+        pageNoteSave.cancel();
+        if (boundUrl) {
+          // Keep the text on screen to copy, but stop saving it anywhere.
+          endedMessage = previous === "aside" ? "Discarded in Media Log" : "Added to your log";
+          notebook.setReadOnly(true);
+          notebook.setSaveState("saved", endedMessage);
+        } else {
+          notebook.setValue("");
+          showTitle(null);
+          notebook.setSaveState("saved", "Added to your log");
+        }
+        return;
+      }
+      notebook.setReadOnly(false);
+      showTitle(found.draft);
+      if (found.place === "aside") notebook.setSaveState("saved", "Set aside in Media Log; still saving here");
+      else if (previous === "aside" || previous === "gone") notebook.setSaveState("saved");
+      // Take edits made in the popup, but never overwrite this page while you type here.
+      if (!document.hasFocus() && typeof found.draft?.note === "string") notebook.setValue(found.draft.note);
+    }).catch(() => {});
   });
 }
 
@@ -856,6 +978,11 @@ function bindPopup() {
 
   bindDraftFields();
   $("entry-form").addEventListener("submit", addEntry);
+  $("parked-draft").addEventListener("click", (event) => {
+    const action = event.target.closest("button[data-parked]")?.dataset.parked;
+    if (action === "restore") restoreParkedDraft();
+    if (action === "discard") discardParkedDraft();
+  });
   for (const button of document.querySelectorAll("[data-notebook-for]")) {
     button.addEventListener("click", () => openNotebookFor(button.dataset.notebookFor));
   }
@@ -909,7 +1036,7 @@ async function init() {
     switchTab("history");
     renderHistory();
   }
-  const restoredDraft = restoreDraft(stored.addDraft);
+  const restoredDraft = await openDraftForPage(stored, tabQuery);
   await prefillFromTab({ preserveDraftType: restoredDraft, tabQuery });
 }
 

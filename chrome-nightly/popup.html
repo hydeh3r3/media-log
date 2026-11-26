@@ -30,14 +30,21 @@
 
   <!-- Add Entry -->
   <section id="tab-add" class="tab-content active">
+    <div id="parked-draft" class="draft-notice" role="status" hidden>
+      <span class="draft-notice-text">Unfinished entry set aside: “<span class="draft-notice-title"></span>”<span class="draft-notice-more"></span></span>
+      <span class="draft-notice-actions">
+        <button type="button" data-parked="restore">Restore</button>
+        <button type="button" data-parked="discard">Discard</button>
+      </span>
+    </div>
     <form id="entry-form">
       <label>
         URL (optional)
-        <input type="url" id="entry-url">
+        <input type="url" id="entry-url" pattern="https?://.+" title="Use a link that starts with http:// or https://">
       </label>
       <label>
         Title
-        <input type="text" id="entry-title" required>
+        <input type="text" id="entry-title" maxlength="5000" required>
       </label>
       <label>
         Type
@@ -59,7 +66,7 @@
             Expand
           </button>
         </div>
-        <textarea id="entry-note" rows="3" placeholder="Quick thoughts, or expand for the full notebook"></textarea>
+        <textarea id="entry-note" rows="3" maxlength="100000" placeholder="Quick thoughts, or expand for the full notebook"></textarea>
       </div>
       <button type="submit" id="btn-add" class="btn">Add</button>
       <div id="add-status" class="status" role="status"></div>
@@ -75,11 +82,11 @@
     <form id="edit-form" class="edit-form" hidden>
       <label>
         Title
-        <input type="text" id="edit-title" required>
+        <input type="text" id="edit-title" maxlength="5000" required>
       </label>
       <label>
         URL (optional)
-        <input type="url" id="edit-url">
+        <input type="url" id="edit-url" pattern="https?://.+" title="Use a link that starts with http:// or https://">
       </label>
       <label>
         Type
@@ -101,7 +108,7 @@
             Expand
           </button>
         </div>
-        <textarea id="edit-note" rows="3"></textarea>
+        <textarea id="edit-note" rows="3" maxlength="100000"></textarea>
       </div>
       <div class="edit-actions">
         <button type="submit" class="btn">Save</button>
@@ -142,7 +149,7 @@
     </label>
     <div class="data-transfer">
       <h2>Data Transfer</h2>
-      <p>Move your current week, full history, draft, name, and theme between browsers.</p>
+      <p>Move your current week, full history, drafts, name, and theme between browsers.</p>
       <div class="data-transfer-actions">
         <button type="button" id="btn-export-backup" class="btn">Export All Data</button>
         <button type="button" id="btn-import-backup" class="btn btn-secondary">Import Backup</button>
@@ -219,7 +226,7 @@
     </div>
 
     <div class="nb-body" data-view="write">
-      <textarea class="nb-editor" aria-label="Note" spellcheck="true" placeholder="Start writing. Markdown works: # heading, **bold**, - list, - [ ] checklist, > quote"></textarea>
+      <textarea class="nb-editor" aria-label="Note" spellcheck="true" maxlength="100000" placeholder="Start writing. Markdown works: # heading, **bold**, - list, - [ ] checklist, > quote"></textarea>
       <article class="nb-preview md" aria-label="Preview"></article>
     </div>
 

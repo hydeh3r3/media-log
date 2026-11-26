@@ -8,6 +8,8 @@ Keep Nightly's manifest key and folder path. Use Reload on the existing extensio
 
 Browser storage keeps `currentWeek`, `history`, `addDraft`, `userName`, and `theme`. This cleanup does not change those keys or their format.
 
+`parkedDrafts` lists unfinished entries set aside, newest first. When Media Log opens on a different web page than the draft's URL, the open page fills the form and the draft joins this list. The Add tab offers Restore or Discard for the newest one; Restore steps through the list. An entry set aside for the page you open comes back by itself. Full backups include the list.
+
 The Add and Edit menus offer Anime, Article, Book, Film, Game, Manga, Podcast, and TV Show. YouTube links default to Podcast. The menus are built from `SELECTABLE_TYPES` in `chrome-nightly/core.js`.
 
 ## Weeks
@@ -16,7 +18,7 @@ The current week moves to History when a new ISO week starts. There is no manual
 
 ## Notebook
 
-Expand beside Note opens the notebook inside the popup. Its pop-out button opens `popup.html?notebook=1` in a tab, which edits only the Add draft's note. Notes stay plain text with Markdown, so storage, backups, and the website bridge keep the same format. Notes can hold up to 100,000 characters.
+Expand beside Note opens the notebook inside the popup. Its pop-out button saves the form and opens `popup.html?notebook=1` in a tab, which edits that entry's note. The page finds the entry by URL, keeps saving into it if it is set aside, and turns read-only once it is added or discarded. Notes stay plain text with Markdown, so storage, backups, and the website bridge keep the same format. Notes can hold up to 100,000 characters.
 
 Video time reads the playing video's position from the tab Media Log was opened on. It reads nothing else from the page.
 

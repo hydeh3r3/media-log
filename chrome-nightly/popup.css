@@ -398,6 +398,52 @@ textarea {
   cursor: pointer;
 }
 
+/* An unfinished entry from another page, waiting above the Add form. */
+.draft-notice {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 12px;
+  padding: 8px 10px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent);
+  border-radius: var(--radius);
+  color: var(--muted-strong);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.draft-notice-title {
+  color: var(--text);
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.draft-notice-actions {
+  display: flex;
+  gap: 12px;
+}
+
+.draft-notice-actions button {
+  padding: 0;
+  background: none;
+  border: none;
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.draft-notice-actions button[data-parked="discard"] {
+  color: var(--muted);
+}
+
+.draft-notice-actions button:hover {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
 /* ===== This Week ===== */
 #week-header {
   font-size: 15px;
@@ -987,6 +1033,11 @@ body.notebook-open > .toast {
 
 .nb-spacer {
   flex: 1;
+}
+
+.notebook.is-readonly .nb-toolbar {
+  opacity: 0.45;
+  pointer-events: none;
 }
 
 .nb-body {

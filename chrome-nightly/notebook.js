@@ -539,7 +539,7 @@
     }
 
     function apply(edit) {
-      if (!edit) return false;
+      if (!edit || editor.readOnly) return false;
       applyEdit(editor, edit);
       return true;
     }
@@ -642,6 +642,10 @@
     rootEl.addEventListener("click", (event) => {
       const box = event.target.closest("input[type=checkbox][data-line]");
       if (box && preview.contains(box)) {
+        if (editor.readOnly) {
+          event.preventDefault();
+          return;
+        }
         const next = toggleTaskLine(editor.value, Number(box.dataset.line));
         if (next !== editor.value) {
           editor.value = next;
@@ -669,6 +673,8 @@
           for (const element of rootEl.querySelectorAll(selector)) element.hidden = !enabled;
         }
         editor.value = options.value || "";
+        editor.readOnly = false;
+        rootEl.classList.remove("is-readonly");
         renderedSource = null;
         setSaveState(options.saveState || "idle", options.saveText);
         applyPrefs();
@@ -684,6 +690,11 @@
       },
       setTitle(title) {
         titleEl.textContent = title || "Untitled entry";
+      },
+      // Leave the text visible but stop all editing, e.g. once the entry has been added.
+      setReadOnly(readOnly) {
+        editor.readOnly = readOnly;
+        rootEl.classList.toggle("is-readonly", readOnly);
       },
       setSaveState,
       flash,

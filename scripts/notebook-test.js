@@ -111,4 +111,34 @@ assert.deepEqual(nb.parseInline("snake_case_name").map((node) => node.type), ["t
 assert.deepEqual(nb.parseInline("*a* and _b_ and ~~c~~ and `d`").map((node) => node.type), ["em", "text", "em", "text", "del", "text", "code"]);
 assert.equal(nb.parseMarkdown("2 * 3 * 4 = 24")[0].type, "paragraph", "A lone asterisk is not a list");
 
-console.log("Notebook editing helpers, counts, Markdown parsing, and link safety passed.");
+// --- Rendering, through a minimal fake DOM: no HTML parsing, and only http(s) links become <a>. ---
+function fakeDocument() {
+  const node = (tagName) => ({
+    tagName, children: [], dataset: {}, attributes: {},
+    append(...items) { for (const item of items) this.children.push(item); },
+    set textContent(text) { this.children = [String(text)]; },
+  });
+  return { createElement: (tag) => node(tag.toUpperCase()), createDocumentFragment: () => node("#fragment") };
+}
+const flatten = (item, out = []) => {
+  if (typeof item === "string") return out;
+  out.push(item);
+  for (const child of item.children) flatten(child, out);
+  return out;
+};
+const textOf = (item) => (typeof item === "string" ? item : item.children.map(textOf).join(""));
+const rendered = nb.renderMarkdown([
+  "<img src=x onerror=alert(1)> **bold** [ok](https://example.com/x) [bad](javascript:alert(1))",
+  "- [ ] task",
+].join("\n"), { document: fakeDocument() });
+const elements = flatten(rendered);
+const tags = elements.map((element) => element.tagName);
+assert.ok(!tags.includes("IMG") && !tags.includes("SCRIPT"), "Raw HTML in a note stays text");
+assert.ok(textOf(rendered).includes("<img src=x onerror=alert(1)>"), "The HTML is shown as written");
+const links = elements.filter((element) => element.tagName === "A");
+assert.deepEqual(links.map((link) => link.href), ["https://example.com/x"], "Only the http(s) link becomes a link");
+assert.ok(links.every((link) => link.rel === "noopener noreferrer" && link.target === "_blank"));
+const box = elements.find((element) => element.tagName === "INPUT");
+assert.equal(box.disabled, true, "Checkboxes in saved notes are read-only");
+
+console.log("Notebook editing helpers, counts, Markdown parsing and rendering, and link safety passed.");

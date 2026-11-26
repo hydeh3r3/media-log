@@ -8,6 +8,7 @@ Nightly is the only supported app in this repo.
 - Make title cleanup specific to the requested site.
 - Keep manga chapter numbers and anime season and episode text.
 - Let manual title and type edits win over a pending lookup.
+- A draft resumes only on its own page. On a different web page, that page fills the form and the draft is set aside with Restore and Discard.
 - Keep Music out of the Add and Edit menus.
 - Use full backup import and export to move data between browser profiles.
 - Keep notes as plain text. The notebook's Markdown renders in the popup only; storage and the website bridge get the text unchanged.

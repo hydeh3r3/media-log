@@ -29,7 +29,7 @@ Open `chrome://extensions` and click Reload for Media Log. Keep the same folder 
 
 Import replaces that profile's Media Log data. Export a destination backup first if it has entries you want to keep.
 
-The full backup includes the current week, history, draft when present, name, and theme. A single-week export is not a full backup.
+The full backup includes the current week, history, drafts and set-aside entries when present, name, and theme. A single-week export is not a full backup.
 
 ## Check the Code
 
@@ -45,6 +45,8 @@ Verification checks Nightly's JavaScript, manifest, title and type rules, form b
 ## Check the Popup
 
 Open a content page and then Media Log. Check the title, URL, type, and date. Change the title or type while a page lookup is pending; your edit should stay.
+
+Type a note, close Media Log, and open it on a different page. The new page should fill the form, with your unfinished entry offered above it to Restore or Discard.
 
 Choose Expand beside Note. The popup widens into the notebook. Type a list item and press Enter; the next item starts on its own. Switch between Write, Split, and Preview, then choose Done. The note should be back in the form.
 

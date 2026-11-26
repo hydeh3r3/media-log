@@ -84,6 +84,21 @@ for (const [label, validator] of [["Nightly", chromeValidator]]) {
   longNote.data.addDraft = { url: "", title: "", type: "article", date: "", rating: "", note: "draft ".repeat(15_000) };
   const longData = validator.validateBackup(longNote);
   assert.equal(longData.history[0].entries[0].note.length, 90_000, `${label} should keep a 90,000 character note.`);
+  // Set-aside entries travel with the backup, and draft links that are not web links are dropped
+  // on export so they can't block the import.
+  const withParked = validator.createBackup({
+    ...syntheticBackup().data,
+    addDraft: { url: "chrome-extension://abc/popup.html?notebook=1", title: "", type: "article", date: "", rating: "", note: "loose" },
+    parkedDrafts: [{ url: "https://example.com/a", title: "A", type: "film", date: "2026-08-05", rating: "", note: "aside" }],
+  }, new Date("2026-08-06T00:00:00Z"));
+  assert.equal(withParked.data.addDraft.url, "", `${label} should drop a non-web draft link on export.`);
+  const parkedData = validator.validateBackup(JSON.parse(JSON.stringify(withParked)));
+  assert.deepEqual(parkedData.parkedDrafts.map((draft) => draft.note), ["aside"], `${label} should keep set-aside entries.`);
+  assert.equal(validator.validateBackup(syntheticBackup()).parkedDrafts, undefined, `${label} should accept backups without set-aside entries.`);
+  const badParked = structuredClone(syntheticBackup());
+  badParked.data.parkedDrafts = { not: "a list" };
+  assert.throws(() => validator.validateBackup(badParked), /must be a list/, `${label} should reject a malformed set-aside list.`);
+
   const tooLong = structuredClone(syntheticBackup());
   tooLong.data.history[0].entries[0].note = "x".repeat(100_001);
   assert.throws(() => validator.validateBackup(tooLong), /too long/, `${label} should reject notes over the limit.`);

@@ -36,8 +36,10 @@
     note: 100_000,
     url: 10_000,
     name: 200,
+    parkedDrafts: 1_000,
   });
 
+  const isWebUrl = (url) => /^https?:\/\//i.test(url || "");
   const normalizeSelectableType = (type) => (SELECTABLE_SET.has(type) ? type : DEFAULT_ENTRY_TYPE);
   const typeLabel = (type) => ENTRY_TYPES[type] || type;
 
@@ -190,6 +192,28 @@
   }
 
   const emptyDraft = (overrides = {}) => ({ url: "", title: "", type: DEFAULT_ENTRY_TYPE, date: "", rating: "", note: "", ...overrides });
+
+  // Decide what fills the Add form when the popup opens on `pageUrl`. A draft resumes on its own
+  // page (or when there is no web page to read). On a different web page, the open page wins: the
+  // draft joins the set-aside list (newest first), and an entry set aside earlier for this page comes back.
+  // Returns { form, parked, changed }; `form` is null when the page should fill the form.
+  function planDrafts(addDraft, parked = [], pageUrl = "") {
+    const onWebPage = isWebUrl(pageUrl);
+    if (addDraft && !(addDraft.url && onWebPage && addDraft.url !== pageUrl)) {
+      return { form: addDraft, parked, changed: false };
+    }
+    const list = addDraft ? [addDraft, ...parked] : [...parked];
+    const index = onWebPage ? list.findIndex((draft) => draft.url === pageUrl) : -1;
+    const form = index >= 0 ? list.splice(index, 1)[0] : null;
+    return { form, parked: list, changed: Boolean(addDraft) || index >= 0 };
+  }
+
+  // Restore: the newest set-aside entry fills the form. A draft already in the form goes to the back
+  // of the list, so repeated Restores step through every entry and nothing is dropped.
+  function restoreParked(current, parked) {
+    const [form, ...rest] = parked;
+    return form ? { form, parked: current ? [...rest, current] : rest } : null;
+  }
 
   // Turn raw form values into a stored entry. Returns null when the title or date is missing.
   function buildEntry(fields, createdAt) {
@@ -377,8 +401,18 @@
 
     const addDraft = validateDraft(value.data.addDraft);
     if (addDraft) data.addDraft = addDraft;
+
+    if (value.data.parkedDrafts !== undefined) {
+      assertBackup(Array.isArray(value.data.parkedDrafts), "Set-aside entries must be a list.");
+      assertBackup(value.data.parkedDrafts.length <= LIMITS.parkedDrafts, "Backup contains too many set-aside entries.");
+      const parked = value.data.parkedDrafts.map((draft) => validateDraft(draft)).filter(Boolean);
+      if (parked.length) data.parkedDrafts = parked;
+    }
     return data;
   }
+
+  // Drafts keep only web links in a backup; any other URL would make the whole file fail to import.
+  const portableDraft = (draft) => (draft ? { ...draft, url: isWebUrl(draft.url) ? draft.url : "" } : draft);
 
   function createBackup(stored, now = new Date()) {
     return {
@@ -388,7 +422,8 @@
       data: {
         currentWeek: stored.currentWeek,
         history: stored.history || [],
-        addDraft: stored.addDraft,
+        addDraft: portableDraft(stored.addDraft),
+        ...(stored.parkedDrafts?.length ? { parkedDrafts: stored.parkedDrafts.map(portableDraft) } : {}),
         userName: stored.userName || "",
         theme: THEMES.has(stored.theme) ? stored.theme : DEFAULT_THEME,
       },
@@ -427,11 +462,11 @@
 
   root.MediaLogCore = Object.freeze({
     ENTRY_TYPES, SELECTABLE_TYPES, DEFAULT_ENTRY_TYPE, THEMES, DEFAULT_THEME, BACKUP_FORMAT, BACKUP_VERSION, LIMITS,
-    normalizeSelectableType, typeLabel, pluralize,
+    normalizeSelectableType, typeLabel, pluralize, isWebUrl,
     getISOWeek, getWeekBounds, formatDate, localDateString, formatDateRange, formatDayHeader, getWeekInfoForDate,
     createWeek, isSameWeek, weekKey, weekLabel,
     sortEntries, ensureHistoryWeek, placeEntryInWeek, normalizeCreatedAt, rollWeek,
-    emptyDraft, buildEntry, entryMeta, groupByDay, weekExport,
+    emptyDraft, planDrafts, restoreParked, buildEntry, entryMeta, groupByDay, weekExport,
     parseSearch, entryMatchesSearch,
     assertBackup, validateBackup, createBackup, countBackupEntries, stableSerialize, verifyPortableStorage, describeBackupCoverage,
   });

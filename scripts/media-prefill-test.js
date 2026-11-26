@@ -182,6 +182,40 @@ assert.equal(raw.field("title"), unchangedTitle);
 const internal = setup({ tab: { id: 10, url: "about:blank", title: "Internal tab title" } });
 await internal.prefill();
 assert.equal(internal.field("title"), "Internal tab title");
+assert.equal(internal.field("url"), "", "Only web links fill the URL; others would break backup import");
+const ownPage = setup({ tab: { id: 16, url: "chrome-extension://abc/popup.html?notebook=1", title: "Notes · Media Log notes" } });
+await ownPage.prefill();
+assert.equal(ownPage.field("url"), "");
+
+// A saved draft resumes on its own page. On a different web page the open page fills the form,
+// the draft is set aside, and nothing set aside is ever overwritten.
+const imdb = "https://www.imdb.com/title/tt37510326/";
+const leftover = { url: "http://localhost:5197/app/#/MOR-108?s=top", title: "Manifesto · more", note: "first idea" };
+const imdbDraft = { url: imdb, title: "The Social Reckoning (2026)", note: "courtroom" };
+const older = { url: "https://example.com/older", title: "Older", note: "keep me" };
+
+assert.deepEqual(core.planDrafts(null, [], imdb), { form: null, parked: [], changed: false });
+assert.deepEqual(core.planDrafts(imdbDraft, [older], imdb), { form: imdbDraft, parked: [older], changed: false }, "Same page resumes");
+assert.deepEqual(core.planDrafts(leftover, [], imdb), { form: null, parked: [leftover], changed: true }, "A draft from another page must not block the open page");
+assert.deepEqual(core.planDrafts(leftover, [older], imdb).parked, [leftover, older], "Set-aside entries accumulate, newest first");
+assert.deepEqual(core.planDrafts(leftover, [imdbDraft, older], imdb), { form: imdbDraft, parked: [leftover, older], changed: true }, "This page's set-aside entry comes back");
+assert.deepEqual(core.planDrafts(null, [older, imdbDraft], imdb), { form: imdbDraft, parked: [older], changed: true });
+assert.equal(core.planDrafts({ ...leftover, url: "" }, [], imdb).form.title, "Manifesto · more", "A draft without a URL resumes");
+assert.deepEqual(core.planDrafts(leftover, [older], "chrome://newtab/"), { form: leftover, parked: [older], changed: false }, "No web page: resume the draft");
+assert.equal(core.planDrafts(leftover, [], undefined).form, leftover);
+
+// Restore steps through every set-aside entry; the draft in the form goes to the back, never away.
+assert.equal(core.restoreParked(imdbDraft, []), null);
+assert.deepEqual(core.restoreParked(imdbDraft, [leftover, older]), { form: leftover, parked: [older, imdbDraft] });
+assert.deepEqual(core.restoreParked(null, [leftover, older]), { form: leftover, parked: [older] }, "A form with no draft has nothing to keep");
+{
+  let form = imdbDraft;
+  let parked = [leftover, older];
+  const seen = [form.title];
+  for (let i = 0; i < 3; i++) ({ form, parked } = core.restoreParked(form, parked)), seen.push(form.title);
+  assert.deepEqual(seen, ["The Social Reckoning (2026)", "Manifesto · more", "Older", "The Social Reckoning (2026)"]);
+  assert.equal(parked.length, 2, "Three entries in, three entries out");
+}
 
 // The default date is the local calendar day.
 assert.match(normal.field("date"), /^\d{4}-\d{2}-\d{2}$/);
